@@ -1,5 +1,7 @@
 # Claude Notifier
 
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/SingularityInc.claude-notifier)](https://marketplace.visualstudio.com/items?itemName=SingularityInc.claude-notifier)
+
 Plays a sound and shows a notification when [Claude Code](https://claude.com/claude-code) finishes a task, needs permission, or asks a question.
 
 Stop watching the screen — go grab a coffee and let Claude ping you when it needs you.
@@ -18,13 +20,13 @@ Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Cl
 
 ### Option 1: VSCode Extension
 
-Download the latest `.vsix` from [Releases](https://github.com/ashmitb95/claude-notifier/releases), then:
+Install from the [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=SingularityInc.claude-notifier):
 
 ```sh
-code --install-extension claude-notifier-*.vsix
+code --install-extension SingularityInc.claude-notifier
 ```
 
-Or in VSCode: `Cmd+Shift+P` / `Ctrl+Shift+P` → "Extensions: Install from VSIX..."
+Or search for **"Claude Notifier"** in the Extensions tab (`Cmd+Shift+X` / `Ctrl+Shift+X`).
 
 The extension auto-configures everything on activation. Reload VSCode after installing.
 
