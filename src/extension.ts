@@ -1,81 +1,72 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { execFile, execSync } from "child_process";
+import { execFile, exec } from "child_process";
 
-const HOME = process.env.HOME || "~";
+const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
-const HOOK_SCRIPT = path.join(HOOKS_DIR, "claude-notifier-on-stop.sh");
+const HOOK_SCRIPT = path.join(HOOKS_DIR, "claude-notifier-on-stop.js");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
-const SOUNDS = {
-  input: "/System/Library/Sounds/Glass.aiff",
-  done: "/System/Library/Sounds/Hero.aiff",
+const IS_WIN = process.platform === "win32";
+
+const SOUNDS: Record<string, { darwin: string; win32: string }> = {
+  input: {
+    darwin: "/System/Library/Sounds/Glass.aiff",
+    win32: "C:\\Windows\\Media\\Windows Notify.wav",
+  },
+  done: {
+    darwin: "/System/Library/Sounds/Hero.aiff",
+    win32: "C:\\Windows\\Media\\tada.wav",
+  },
 };
 
-const HOOK_SCRIPT_CONTENT = `#!/bin/bash
-# Auto-managed by Claude Notifier VSCode extension — do not edit manually.
+// Node.js hook script — works on macOS, Windows, and Linux.
+const HOOK_SCRIPT_CONTENT = `#!/usr/bin/env node
+// Auto-managed by Claude Notifier VSCode extension — do not edit manually.
+const fs = require("fs");
+const path = require("path");
 
-INPUT=$(cat)
-STOP_HOOK_ACTIVE=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null)
+let raw = "";
+process.stdin.setEncoding("utf-8");
+process.stdin.on("data", (chunk) => (raw += chunk));
+process.stdin.on("end", () => {
+  let input = {};
+  try { input = JSON.parse(raw); } catch { process.exit(0); }
 
-if [ "$STOP_HOOK_ACTIVE" = "True" ]; then
-  exit 0
-fi
+  if (input.stop_hook_active) process.exit(0);
 
-TRANSCRIPT=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('transcript_path', ''))" 2>/dev/null)
+  let reason = "done";
+  const transcript = input.transcript_path || "";
 
-REASON="done"
+  if (transcript && fs.existsSync(transcript)) {
+    try {
+      const data = fs.readFileSync(transcript, "utf-8").trim();
+      const lines = data.split("\\n").slice(-20);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const msg = JSON.parse(lines[i]);
+          if (msg.role === "assistant" && Array.isArray(msg.content) && msg.content.length > 0) {
+            const last = msg.content[msg.content.length - 1];
+            if (last.type === "tool_use") {
+              reason = "input";
+            } else if (last.type === "text" && last.text && last.text.trim().endsWith("?")) {
+              reason = "input";
+            }
+            break;
+          }
+        } catch {}
+      }
+    } catch {}
+  }
 
-if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
-  LAST_MSG=$(tail -20 "$TRANSCRIPT" | python3 -c "
-import sys, json
-lines = sys.stdin.read().strip().split('\\n')
-for line in reversed(lines):
-    try:
-        msg = json.loads(line)
-        if msg.get('role') == 'assistant':
-            content = msg.get('content', [])
-            if isinstance(content, list) and len(content) > 0:
-                last_block = content[-1]
-                if last_block.get('type') == 'tool_use':
-                    print('input')
-                elif last_block.get('type') == 'text':
-                    text = last_block.get('text', '')
-                    if text.strip().endswith('?'):
-                        print('input')
-                    else:
-                        print('done')
-                else:
-                    print('done')
-            else:
-                print('done')
-            break
-    except:
-        continue
-else:
-    print('done')
-" 2>/dev/null)
-
-  if [ -n "$LAST_MSG" ]; then
-    REASON="$LAST_MSG"
-  fi
-fi
-
-echo "$REASON $(date +%s)" > ~/.claude/hooks/claude-signal
-exit 0
+  const signalFile = path.join(__dirname, "claude-signal");
+  fs.writeFileSync(signalFile, reason + " " + Date.now());
+  process.exit(0);
+});
 `;
-
-const HOOK_ENTRY = {
-  hooks: [
-    {
-      type: "command",
-      command: HOOK_SCRIPT,
-    },
-  ],
-};
 
 let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
@@ -84,7 +75,6 @@ let soundEnabled = true;
 export function activate(context: vscode.ExtensionContext) {
   setupHook();
 
-  // Ensure signal file exists
   if (!fs.existsSync(SIGNAL_FILE)) {
     fs.writeFileSync(SIGNAL_FILE, "");
   }
@@ -138,28 +128,46 @@ function handleSignal() {
 
   if (reason === "input") {
     vscode.window.showInformationMessage("Claude is waiting for your input.");
-    playSound(SOUNDS.input);
+    playSound("input");
   } else if (reason === "done") {
     vscode.window.showInformationMessage("Claude has finished the task.");
-    playSound(SOUNDS.done);
+    playSound("done");
   }
 }
 
-function playSound(soundFile: string) {
+function playSound(type: string) {
   if (!soundEnabled) {
     return;
   }
-  execFile("afplay", [soundFile], () => {});
+
+  const platform = process.platform === "win32" ? "win32" : "darwin";
+  const soundFile = SOUNDS[type]?.[platform];
+  if (!soundFile) {
+    return;
+  }
+
+  if (IS_WIN) {
+    exec(
+      `powershell -c "(New-Object Media.SoundPlayer '${soundFile}').PlaySync()"`,
+      () => {}
+    );
+  } else {
+    execFile("afplay", [soundFile], () => {});
+  }
 }
 
 // --- Hook lifecycle ---
 
+function hookCommand(): string {
+  return IS_WIN
+    ? `node "${HOOK_SCRIPT}"`
+    : `node "${HOOK_SCRIPT}"`;
+}
+
 function setupHook() {
-  // Create hook script
   fs.mkdirSync(HOOKS_DIR, { recursive: true });
   fs.writeFileSync(HOOK_SCRIPT, HOOK_SCRIPT_CONTENT, { mode: 0o755 });
 
-  // Add hook to Claude settings
   const settings = readSettings();
   if (!settings.hooks) {
     settings.hooks = {};
@@ -168,36 +176,43 @@ function setupHook() {
     settings.hooks.Stop = [];
   }
 
-  const alreadyInstalled = settings.hooks.Stop.some((entry: any) =>
-    entry.hooks?.some(
-      (h: any) => h.type === "command" && h.command === HOOK_SCRIPT
-    )
+  const cmd = hookCommand();
+
+  // Remove any stale entries (old .sh script or current .js script)
+  settings.hooks.Stop = settings.hooks.Stop.filter(
+    (entry: any) =>
+      !entry.hooks?.some(
+        (h: any) =>
+          h.type === "command" &&
+          (h.command === cmd ||
+            h.command === HOOK_SCRIPT ||
+            h.command.includes("claude-notifier-on-stop"))
+      )
   );
 
-  if (!alreadyInstalled) {
-    settings.hooks.Stop.push(HOOK_ENTRY);
-    writeSettings(settings);
-  }
+  settings.hooks.Stop.push({
+    hooks: [{ type: "command", command: cmd }],
+  });
+
+  writeSettings(settings);
 }
 
 function teardownHook() {
-  // Remove hook script
-  try {
-    fs.unlinkSync(HOOK_SCRIPT);
-  } catch {}
+  try { fs.unlinkSync(HOOK_SCRIPT); } catch {}
+  try { fs.unlinkSync(SIGNAL_FILE); } catch {}
 
-  // Remove signal file
-  try {
-    fs.unlinkSync(SIGNAL_FILE);
-  } catch {}
+  // Also clean up legacy .sh script if it exists
+  const legacyScript = path.join(HOOKS_DIR, "claude-notifier-on-stop.sh");
+  try { fs.unlinkSync(legacyScript); } catch {}
 
-  // Remove our entry from Claude settings
   const settings = readSettings();
   if (settings.hooks?.Stop) {
     settings.hooks.Stop = settings.hooks.Stop.filter(
       (entry: any) =>
         !entry.hooks?.some(
-          (h: any) => h.type === "command" && h.command === HOOK_SCRIPT
+          (h: any) =>
+            h.type === "command" &&
+            h.command.includes("claude-notifier-on-stop")
         )
     );
     if (settings.hooks.Stop.length === 0) {

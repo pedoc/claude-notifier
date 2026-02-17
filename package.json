@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "ashmitb",
   "engines": {
     "vscode": "^1.85.0"

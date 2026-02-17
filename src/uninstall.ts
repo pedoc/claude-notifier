@@ -2,16 +2,19 @@
 import * as fs from "fs";
 import * as path from "path";
 
-const HOME = process.env.HOME || "~";
+const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
-const HOOK_SCRIPT = path.join(HOOKS_DIR, "claude-notifier-on-stop.sh");
-const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
-// Remove hook script and signal file
-try { fs.unlinkSync(HOOK_SCRIPT); } catch {}
-try { fs.unlinkSync(SIGNAL_FILE); } catch {}
+// Remove hook script (both .js and legacy .sh) and signal file
+for (const file of [
+  "claude-notifier-on-stop.js",
+  "claude-notifier-on-stop.sh",
+  "claude-signal",
+]) {
+  try { fs.unlinkSync(path.join(HOOKS_DIR, file)); } catch {}
+}
 
 // Remove our entry from Claude settings
 try {
@@ -20,7 +23,9 @@ try {
     settings.hooks.Stop = settings.hooks.Stop.filter(
       (entry: any) =>
         !entry.hooks?.some(
-          (h: any) => h.type === "command" && h.command === HOOK_SCRIPT
+          (h: any) =>
+            h.type === "command" &&
+            h.command.includes("claude-notifier-on-stop")
         )
     );
     if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;

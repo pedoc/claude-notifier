@@ -6,10 +6,10 @@ Stop watching the screen — go grab a coffee and let Claude ping you when it's 
 
 ## Sounds
 
-| Event | Sound | When |
-|---|---|---|
-| Needs input | **Glass** (gentle chime) | Claude is waiting for permission or asking a question |
-| Task completed | **Hero** (triumphant) | Claude finished the task |
+| Event | macOS | Windows | When |
+|---|---|---|---|
+| Needs input | Glass | Windows Notify | Claude is waiting for permission or asking a question |
+| Task completed | Hero | Tada | Claude finished the task |
 
 ## Install
 
@@ -19,7 +19,7 @@ Download the latest `.vsix` from [Releases](https://github.com/ashmitb95/claude-
 code --install-extension claude-notifier-*.vsix
 ```
 
-Or in VSCode: `Cmd+Shift+P` → "Extensions: Install from VSIX..."
+Or in VSCode: `Cmd+Shift+P` / `Ctrl+Shift+P` → "Extensions: Install from VSIX..."
 
 Reload VSCode after installing.
 
@@ -33,12 +33,12 @@ No manual configuration needed — install and go.
 
 ## Usage
 
-- **Toggle sound**: Click the `🔊 Claude` / `🔇 Claude` item in the status bar (bottom-right), or run `Claude Notifier: Toggle Sound` from the command palette
+- **Toggle sound**: Click the speaker icon in the status bar (bottom-right), or run `Claude Notifier: Toggle Sound` from the command palette
 - **Uninstall**: The extension cleans up its hook script and settings entry automatically
 
 ## Requirements
 
-- macOS (uses `afplay` for sound playback)
+- macOS or Windows
 - [Claude Code](https://claude.com/claude-code) CLI or VSCode extension
 
 ## License
