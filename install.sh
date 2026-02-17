@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Notifier — CLI installer
-# Installs the Stop hook so you get sound + notification when Claude finishes.
+# Installs hooks for sound + notification when Claude finishes, needs permission, or asks a question.
 # Works with Claude Code in terminal, vim, etc. No VSCode needed.
 #
 # Usage:
@@ -13,38 +13,58 @@ set -e
 
 CLAUDE_DIR="$HOME/.claude"
 HOOKS_DIR="$CLAUDE_DIR/hooks"
-HOOK_SCRIPT="$HOOKS_DIR/claude-notifier-on-stop.js"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 REPO_RAW="https://raw.githubusercontent.com/ashmitb95/claude-notifier/main"
 
 echo "Installing Claude Notifier..."
 
-# Create directories
 mkdir -p "$HOOKS_DIR"
 
-# Download hook script
-curl -fsSL "$REPO_RAW/hook/claude-notifier-on-stop.js" -o "$HOOK_SCRIPT"
-chmod +x "$HOOK_SCRIPT"
+for script in claude-notifier-on-stop.js claude-notifier-on-permission.js claude-notifier-on-question.js; do
+  curl -fsSL "$REPO_RAW/hook/$script" -o "$HOOKS_DIR/$script"
+  chmod +x "$HOOKS_DIR/$script"
+done
 
-# Add hook to Claude settings
 if [ ! -f "$SETTINGS_FILE" ]; then
   echo '{}' > "$SETTINGS_FILE"
 fi
 
-# Use node to safely merge into settings.json
+STOP_HOOK="$HOOKS_DIR/claude-notifier-on-stop.js"
+PERM_HOOK="$HOOKS_DIR/claude-notifier-on-permission.js"
+QUESTION_HOOK="$HOOKS_DIR/claude-notifier-on-question.js"
+
 node -e "
 const fs = require('fs');
 const settings = JSON.parse(fs.readFileSync('$SETTINGS_FILE', 'utf-8'));
 if (!settings.hooks) settings.hooks = {};
+
+// Clean stale entries from all hook types
+for (const t of ['Stop', 'PermissionRequest', 'PreToolUse', 'Notification']) {
+  if (settings.hooks[t]) {
+    settings.hooks[t] = settings.hooks[t].filter(
+      e => !e.hooks?.some(h => h.command?.includes('claude-notifier'))
+    );
+    if (settings.hooks[t].length === 0) delete settings.hooks[t];
+  }
+}
+
+// Stop hook — task completed (Hero)
 if (!settings.hooks.Stop) settings.hooks.Stop = [];
-
-// Remove any existing claude-notifier entries
-settings.hooks.Stop = settings.hooks.Stop.filter(
-  e => !e.hooks?.some(h => h.command?.includes('claude-notifier-on-stop'))
-);
-
 settings.hooks.Stop.push({
-  hooks: [{ type: 'command', command: 'node \"$HOOK_SCRIPT\"' }]
+  hooks: [{ type: 'command', command: 'node \"$STOP_HOOK\"' }]
+});
+
+// PermissionRequest hook — needs permission (Glass)
+if (!settings.hooks.PermissionRequest) settings.hooks.PermissionRequest = [];
+settings.hooks.PermissionRequest.push({
+  hooks: [{ type: 'command', command: 'node \"$PERM_HOOK\"' }]
+});
+
+// PreToolUse hook — question asked (Funk)
+if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
+settings.hooks.PreToolUse.push({
+  matcher: 'AskUserQuestion',
+  hooks: [{ type: 'command', command: 'node \"$QUESTION_HOOK\"' }]
 });
 
 fs.writeFileSync('$SETTINGS_FILE', JSON.stringify(settings, null, 2) + '\n');
@@ -53,8 +73,11 @@ fs.writeFileSync('$SETTINGS_FILE', JSON.stringify(settings, null, 2) + '\n');
 echo ""
 echo "Done! Claude Notifier is installed."
 echo ""
-echo "  Sound + notification will play when Claude finishes a task."
-echo "  To mute:   touch ~/.claude/hooks/claude-notifier-muted"
-echo "  To unmute:  rm ~/.claude/hooks/claude-notifier-muted"
+echo "  Three sounds:"
+echo "    Glass  — Claude needs permission"
+echo "    Funk   — Claude is asking a question"
+echo "    Hero   — Claude finished the task"
 echo ""
+echo "  To mute:     touch ~/.claude/hooks/claude-notifier-muted"
+echo "  To unmute:    rm ~/.claude/hooks/claude-notifier-muted"
 echo "  To uninstall: curl -fsSL $REPO_RAW/uninstall.sh | bash"

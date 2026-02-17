@@ -1,8 +1,8 @@
 # Claude Notifier
 
-Plays a sound and shows a notification when [Claude Code](https://claude.com/claude-code) finishes a task or needs your input.
+Plays a sound and shows a notification when [Claude Code](https://claude.com/claude-code) finishes a task, needs permission, or asks a question.
 
-Stop watching the screen — go grab a coffee and let Claude ping you when it's done.
+Stop watching the screen — go grab a coffee and let Claude ping you when it needs you.
 
 Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code.
 
@@ -10,8 +10,9 @@ Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Cl
 
 | Event | macOS | Windows | When |
 |---|---|---|---|
-| Needs input | Glass | Windows Notify | Claude is waiting for permission or asking a question |
-| Task completed | Hero | Tada | Claude finished the task |
+| Needs permission | **Glass** | Windows Notify | Claude needs approval to use a tool |
+| Asks a question | **Funk** | Windows Notify | Claude is asking you something |
+| Task completed | **Hero** | Tada | Claude finished the task |
 
 ## Install
 
@@ -35,8 +36,6 @@ One-line install — no VSCode needed:
 curl -fsSL https://raw.githubusercontent.com/ashmitb95/claude-notifier/main/install.sh | bash
 ```
 
-This registers a [Claude Code Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) that plays a sound and shows an OS notification whenever Claude finishes.
-
 To uninstall:
 
 ```sh
@@ -45,20 +44,24 @@ curl -fsSL https://raw.githubusercontent.com/ashmitb95/claude-notifier/main/unin
 
 ## How it works
 
-1. A [Claude Code Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) runs whenever Claude finishes responding
-2. The hook reads the transcript to determine if Claude is done or needs input
-3. It plays the appropriate system sound and shows an OS notification
-4. If the VSCode extension is installed, it also shows a toast notification inside the editor
+Three [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) are registered:
+
+| Hook | Trigger | Sound |
+|---|---|---|
+| `Stop` | Claude finishes responding | Hero |
+| `PermissionRequest` | Claude needs tool approval | Glass |
+| `PreToolUse` (AskUserQuestion) | Claude asks a question | Funk |
+
+Each hook plays the appropriate system sound and shows an OS notification.
+If the VSCode extension is installed, it also shows a toast notification inside the editor.
 
 ## Usage
 
 - **Mute/unmute (VSCode):** Click the speaker icon in the status bar, or run `Claude Notifier: Toggle Sound` from the command palette
 - **Mute/unmute (CLI):**
   ```sh
-  # Mute
-  touch ~/.claude/hooks/claude-notifier-muted
-  # Unmute
-  rm ~/.claude/hooks/claude-notifier-muted
+  touch ~/.claude/hooks/claude-notifier-muted   # mute
+  rm ~/.claude/hooks/claude-notifier-muted      # unmute
   ```
 
 ## Requirements

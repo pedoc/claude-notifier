@@ -5,26 +5,28 @@ import * as path from "path";
 const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
-const HOOK_SCRIPT = path.join(HOOKS_DIR, "claude-notifier-on-stop.js");
+const STOP_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-stop.js");
+const PERMISSION_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-permission.js");
+const QUESTION_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-question.js");
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
+
+const ALL_HOOK_TYPES = ["Stop", "PermissionRequest", "PreToolUse", "Notification"] as const;
 
 let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
 
 export function activate(context: vscode.ExtensionContext) {
-  setupHook(context);
+  setupHooks(context);
 
-  // Sync mute state from flag file
   soundEnabled = !fs.existsSync(MUTE_FLAG);
 
   if (!fs.existsSync(SIGNAL_FILE)) {
     fs.writeFileSync(SIGNAL_FILE, "");
   }
 
-  // Status bar
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100
@@ -34,7 +36,6 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
-  // Toggle command — writes/removes mute flag so the hook script respects it
   const toggleCmd = vscode.commands.registerCommand(
     "claudeNotifier.toggleSound",
     () => {
@@ -52,7 +53,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(toggleCmd);
 
-  // Watch signal file for VSCode notification toasts
   watcher = fs.watch(SIGNAL_FILE, (eventType) => {
     if (eventType === "change") {
       handleSignal();
@@ -76,9 +76,10 @@ function handleSignal() {
 
   const reason = content.split(" ")[0];
 
-  // Only show VSCode toast — sound + OS notification already handled by the hook
   if (reason === "input") {
-    vscode.window.showInformationMessage("Claude is waiting for your input.");
+    vscode.window.showInformationMessage("Claude needs your permission.");
+  } else if (reason === "question") {
+    vscode.window.showInformationMessage("Claude is asking you a question.");
   } else if (reason === "done") {
     vscode.window.showInformationMessage("Claude has finished the task.");
   }
@@ -86,66 +87,82 @@ function handleSignal() {
 
 // --- Hook lifecycle ---
 
-function setupHook(context: vscode.ExtensionContext) {
+function setupHooks(context: vscode.ExtensionContext) {
   fs.mkdirSync(HOOKS_DIR, { recursive: true });
 
-  // Copy the bundled hook script to the Claude hooks directory
-  const bundledHook = path.join(context.extensionPath, "hook", "claude-notifier-on-stop.js");
-  fs.copyFileSync(bundledHook, HOOK_SCRIPT);
-  fs.chmodSync(HOOK_SCRIPT, 0o755);
+  // Copy bundled hook scripts
+  for (const [bundled, dest] of [
+    ["claude-notifier-on-stop.js", STOP_HOOK],
+    ["claude-notifier-on-permission.js", PERMISSION_HOOK],
+    ["claude-notifier-on-question.js", QUESTION_HOOK],
+  ]) {
+    const src = path.join(context.extensionPath, "hook", bundled);
+    fs.copyFileSync(src, dest);
+    fs.chmodSync(dest, 0o755);
+  }
 
-  const cmd = `node "${HOOK_SCRIPT}"`;
   const settings = readSettings();
   if (!settings.hooks) {
     settings.hooks = {};
   }
-  if (!settings.hooks.Stop) {
-    settings.hooks.Stop = [];
+
+  // Remove all stale claude-notifier entries from every hook type
+  for (const hookType of ALL_HOOK_TYPES) {
+    if (settings.hooks[hookType]) {
+      settings.hooks[hookType] = settings.hooks[hookType].filter(
+        (entry: any) => !entry.hooks?.some((h: any) => h.command?.includes("claude-notifier"))
+      );
+      if (settings.hooks[hookType].length === 0) {
+        delete settings.hooks[hookType];
+      }
+    }
   }
 
-  // Remove any stale entries
-  settings.hooks.Stop = settings.hooks.Stop.filter(
-    (entry: any) =>
-      !entry.hooks?.some(
-        (h: any) =>
-          h.type === "command" &&
-          h.command.includes("claude-notifier-on-stop")
-      )
-  );
-
+  // Stop hook — task completed
+  if (!settings.hooks.Stop) settings.hooks.Stop = [];
   settings.hooks.Stop.push({
-    hooks: [{ type: "command", command: cmd }],
+    hooks: [{ type: "command", command: `node "${STOP_HOOK}"` }],
+  });
+
+  // PermissionRequest hook — needs permission
+  if (!settings.hooks.PermissionRequest) settings.hooks.PermissionRequest = [];
+  settings.hooks.PermissionRequest.push({
+    hooks: [{ type: "command", command: `node "${PERMISSION_HOOK}"` }],
+  });
+
+  // PreToolUse hook — question asked
+  if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
+  settings.hooks.PreToolUse.push({
+    matcher: "AskUserQuestion",
+    hooks: [{ type: "command", command: `node "${QUESTION_HOOK}"` }],
   });
 
   writeSettings(settings);
 }
 
-function teardownHook() {
-  try { fs.unlinkSync(HOOK_SCRIPT); } catch {}
-  try { fs.unlinkSync(SIGNAL_FILE); } catch {}
-  try { fs.unlinkSync(MUTE_FLAG); } catch {}
-
-  const legacyScript = path.join(HOOKS_DIR, "claude-notifier-on-stop.sh");
-  try { fs.unlinkSync(legacyScript); } catch {}
+function teardownHooks() {
+  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG]) {
+    try { fs.unlinkSync(file); } catch {}
+  }
+  for (const legacy of ["claude-notifier-on-stop.sh", "claude-notifier-on-notification.js"]) {
+    try { fs.unlinkSync(path.join(HOOKS_DIR, legacy)); } catch {}
+  }
 
   const settings = readSettings();
-  if (settings.hooks?.Stop) {
-    settings.hooks.Stop = settings.hooks.Stop.filter(
-      (entry: any) =>
-        !entry.hooks?.some(
-          (h: any) =>
-            h.type === "command" &&
-            h.command.includes("claude-notifier-on-stop")
-        )
-    );
-    if (settings.hooks.Stop.length === 0) {
-      delete settings.hooks.Stop;
+  for (const hookType of ALL_HOOK_TYPES) {
+    if (settings.hooks?.[hookType]) {
+      settings.hooks[hookType] = settings.hooks[hookType].filter(
+        (entry: any) => !entry.hooks?.some((h: any) => h.command?.includes("claude-notifier"))
+      );
+      if (settings.hooks[hookType].length === 0) {
+        delete settings.hooks[hookType];
+      }
     }
-    if (Object.keys(settings.hooks).length === 0) {
-      delete settings.hooks;
-    }
-    writeSettings(settings);
   }
+  if (settings.hooks && Object.keys(settings.hooks).length === 0) {
+    delete settings.hooks;
+  }
+  writeSettings(settings);
 }
 
 function readSettings(): any {
@@ -166,5 +183,5 @@ export function deactivate() {
     watcher.close();
     watcher = null;
   }
-  teardownHook();
+  teardownHooks();
 }
