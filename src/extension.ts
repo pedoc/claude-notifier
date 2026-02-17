@@ -90,23 +90,41 @@ function handleSignal() {
 function setupHooks(context: vscode.ExtensionContext) {
   fs.mkdirSync(HOOKS_DIR, { recursive: true });
 
-  // Copy bundled hook scripts
+  // Copy bundled hook scripts (only if changed)
   for (const [bundled, dest] of [
     ["claude-notifier-on-stop.js", STOP_HOOK],
     ["claude-notifier-on-permission.js", PERMISSION_HOOK],
     ["claude-notifier-on-question.js", QUESTION_HOOK],
   ]) {
     const src = path.join(context.extensionPath, "hook", bundled);
-    fs.copyFileSync(src, dest);
-    fs.chmodSync(dest, 0o755);
+    const srcContent = fs.readFileSync(src, "utf-8");
+    let destContent = "";
+    try { destContent = fs.readFileSync(dest, "utf-8"); } catch {}
+    if (srcContent !== destContent) {
+      fs.writeFileSync(dest, srcContent, { mode: 0o755 });
+    }
   }
 
+  // Check if our hooks are already configured — skip settings write if so
   const settings = readSettings();
+  const hasHook = (type: string, needle: string) =>
+    settings.hooks?.[type]?.some((entry: any) =>
+      entry.hooks?.some((h: any) => h.command?.includes(needle))
+    );
+
+  if (
+    hasHook("Stop", "claude-notifier-on-stop") &&
+    hasHook("PermissionRequest", "claude-notifier-on-permission") &&
+    hasHook("PreToolUse", "claude-notifier-on-question")
+  ) {
+    return; // Already configured, don't touch settings.json
+  }
+
   if (!settings.hooks) {
     settings.hooks = {};
   }
 
-  // Remove all stale claude-notifier entries from every hook type
+  // Remove stale claude-notifier entries
   for (const hookType of ALL_HOOK_TYPES) {
     if (settings.hooks[hookType]) {
       settings.hooks[hookType] = settings.hooks[hookType].filter(
