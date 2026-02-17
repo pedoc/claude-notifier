@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "ashmitb",
   "engines": {
     "vscode": "^1.85.0"
@@ -20,7 +20,8 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "vscode:uninstall": "node ./out/uninstall.js"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
