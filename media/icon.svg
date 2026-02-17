@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E57B4D" />
+      <stop offset="100%" stop-color="#D15E35" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="128" height="128" rx="28" fill="url(#bg)" />
+
+  <!-- Bell - clean single path -->
+  <g fill="white">
+    <!-- Cap -->
+    <circle cx="64" cy="36" r="4" />
+    <!-- Body -->
+    <path d="M64,38 C56,38 42,44 40,62 C38,74 37,78 30,84 L98,84 C91,78 90,74 88,62 C86,44 72,38 64,38 Z" />
+    <!-- Rim -->
+    <rect x="30" y="84" width="68" height="5" rx="2.5" />
+    <!-- Clapper -->
+    <circle cx="64" cy="96" r="6" />
+  </g>
+</svg>

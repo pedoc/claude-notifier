@@ -7,10 +7,11 @@ const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
-// Remove hook script (both .js and legacy .sh) and signal file
+// Remove all hook-related files
 for (const file of [
   "claude-notifier-on-stop.js",
   "claude-notifier-on-stop.sh",
+  "claude-notifier-muted",
   "claude-signal",
 ]) {
   try { fs.unlinkSync(path.join(HOOKS_DIR, file)); } catch {}
