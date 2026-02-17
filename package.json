@@ -3,7 +3,11 @@
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
   "version": "1.0.0",
-  "publisher": "ashmitb",
+  "publisher": "SingularityInc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ashmitb95/claude-notifier"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
