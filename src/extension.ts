@@ -5,12 +5,21 @@ import * as path from "path";
 const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
-const STOP_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-stop.js");
-const PERMISSION_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-permission.js");
-const QUESTION_HOOK = path.join(HOOKS_DIR, "claude-notifier-on-question.js");
+const IS_WIN = process.platform === "win32";
+const HOOK_EXT = IS_WIN ? ".ps1" : ".js";
+const STOP_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-stop${HOOK_EXT}`);
+const PERMISSION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-permission${HOOK_EXT}`);
+const QUESTION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-question${HOOK_EXT}`);
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
+
+function hookCmd(hookPath: string): string {
+  if (IS_WIN) {
+    return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${hookPath}"`;
+  }
+  return `node "${hookPath}"`;
+}
 
 const ALL_HOOK_TYPES = ["Stop", "PermissionRequest", "PreToolUse", "Notification"] as const;
 
@@ -92,9 +101,9 @@ function setupHooks(context: vscode.ExtensionContext) {
 
   // Copy bundled hook scripts (only if changed)
   for (const [bundled, dest] of [
-    ["claude-notifier-on-stop.js", STOP_HOOK],
-    ["claude-notifier-on-permission.js", PERMISSION_HOOK],
-    ["claude-notifier-on-question.js", QUESTION_HOOK],
+    [`claude-notifier-on-stop${HOOK_EXT}`, STOP_HOOK],
+    [`claude-notifier-on-permission${HOOK_EXT}`, PERMISSION_HOOK],
+    [`claude-notifier-on-question${HOOK_EXT}`, QUESTION_HOOK],
   ]) {
     const src = path.join(context.extensionPath, "hook", bundled);
     const srcContent = fs.readFileSync(src, "utf-8");
@@ -105,11 +114,12 @@ function setupHooks(context: vscode.ExtensionContext) {
     }
   }
 
-  // Check if our hooks are already configured — skip settings write if so
+  // Check if our hooks are already configured with the right runner — skip if so
   const settings = readSettings();
+  const expectedPrefix = IS_WIN ? "powershell" : "node";
   const hasHook = (type: string, needle: string) =>
     settings.hooks?.[type]?.some((entry: any) =>
-      entry.hooks?.some((h: any) => h.command?.includes(needle))
+      entry.hooks?.some((h: any) => h.command?.includes(needle) && h.command?.startsWith(expectedPrefix))
     );
 
   if (
@@ -117,7 +127,7 @@ function setupHooks(context: vscode.ExtensionContext) {
     hasHook("PermissionRequest", "claude-notifier-on-permission") &&
     hasHook("PreToolUse", "claude-notifier-on-question")
   ) {
-    return; // Already configured, don't touch settings.json
+    return; // Already configured with correct runner, don't touch settings.json
   }
 
   if (!settings.hooks) {
@@ -139,20 +149,20 @@ function setupHooks(context: vscode.ExtensionContext) {
   // Stop hook — task completed
   if (!settings.hooks.Stop) settings.hooks.Stop = [];
   settings.hooks.Stop.push({
-    hooks: [{ type: "command", command: `node "${STOP_HOOK}"` }],
+    hooks: [{ type: "command", command: hookCmd(STOP_HOOK) }],
   });
 
   // PermissionRequest hook — needs permission
   if (!settings.hooks.PermissionRequest) settings.hooks.PermissionRequest = [];
   settings.hooks.PermissionRequest.push({
-    hooks: [{ type: "command", command: `node "${PERMISSION_HOOK}"` }],
+    hooks: [{ type: "command", command: hookCmd(PERMISSION_HOOK) }],
   });
 
   // PreToolUse hook — question asked
   if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
   settings.hooks.PreToolUse.push({
     matcher: "AskUserQuestion",
-    hooks: [{ type: "command", command: `node "${QUESTION_HOOK}"` }],
+    hooks: [{ type: "command", command: hookCmd(QUESTION_HOOK) }],
   });
 
   writeSettings(settings);
@@ -162,8 +172,11 @@ function teardownHooks() {
   for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG]) {
     try { fs.unlinkSync(file); } catch {}
   }
-  for (const legacy of ["claude-notifier-on-stop.sh", "claude-notifier-on-notification.js"]) {
-    try { fs.unlinkSync(path.join(HOOKS_DIR, legacy)); } catch {}
+  // Clean up legacy and cross-platform hook files
+  for (const name of ["claude-notifier-on-stop", "claude-notifier-on-permission", "claude-notifier-on-question", "claude-notifier-on-notification"]) {
+    for (const ext of [".js", ".ps1", ".sh"]) {
+      try { fs.unlinkSync(path.join(HOOKS_DIR, `${name}${ext}`)); } catch {}
+    }
   }
 
   const settings = readSettings();
