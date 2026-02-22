@@ -22,7 +22,23 @@ Or search for **"Claude Notifier"** in the Extensions tab (`Cmd+Shift+X` / `Ctrl
 
 The extension auto-configures everything on activation. Reload VSCode after installing.
 
-### Option 2: CLI (terminal, vim, etc.)
+### Option 2: Homebrew (macOS / Linux)
+
+```sh
+brew tap ashmitb95/claude-notifier
+brew install claude-notifier
+```
+
+If `brew install` fails (e.g. outdated Command Line Tools), use the curl method below.
+
+To uninstall:
+
+```sh
+brew uninstall claude-notifier
+claude-notifier-uninstall  # remove hooks from ~/.claude/settings.json
+```
+
+### Option 3: CLI (curl)
 
 **macOS / Linux / WSL:**
 
