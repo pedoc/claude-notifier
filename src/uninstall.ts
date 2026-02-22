@@ -6,15 +6,17 @@ const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
-for (const file of [
-  "claude-notifier-on-stop.js",
-  "claude-notifier-on-stop.sh",
-  "claude-notifier-on-notification.js",
-  "claude-notifier-on-permission.js",
-  "claude-notifier-on-question.js",
-  "claude-notifier-muted",
-  "claude-signal",
+for (const name of [
+  "claude-notifier-on-stop",
+  "claude-notifier-on-permission",
+  "claude-notifier-on-question",
+  "claude-notifier-on-notification",
 ]) {
+  for (const ext of [".js", ".ps1", ".sh"]) {
+    try { fs.unlinkSync(path.join(HOOKS_DIR, `${name}${ext}`)); } catch {}
+  }
+}
+for (const file of ["claude-notifier-muted", "claude-signal", "claude-notifier-config.json"]) {
   try { fs.unlinkSync(path.join(HOOKS_DIR, file)); } catch {}
 }
 

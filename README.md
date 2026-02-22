@@ -8,14 +8,6 @@ Stop watching the screen — go grab a coffee and let Claude ping you when it ne
 
 Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, and **WSL**.
 
-## Sounds
-
-| Event            | macOS     | Windows        | When                                |
-| ---------------- | --------- | -------------- | ----------------------------------- |
-| Needs permission | **Glass** | Windows Notify | Claude needs approval to use a tool |
-| Asks a question  | **Funk**  | Windows Notify | Claude is asking you something      |
-| Task completed   | **Hero**  | Tada           | Claude finished the task            |
-
 ## Install
 
 ### Option 1: VSCode Extension
@@ -52,34 +44,68 @@ irm https://raw.githubusercontent.com/ashmitb95/claude-notifier/main/install.ps1
 
 > If you don't have a PowerShell install script yet, use the VSCode extension — it auto-configures everything on Windows.
 
+## Settings
+
+Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add to your `settings.json`:
+
+```jsonc
+{
+  // Per-event notification level: "sound+popup" | "sound" | "popup" | "off"
+  "claudeNotifier.taskCompleted.level": "sound+popup",
+  "claudeNotifier.needsPermission.level": "sound+popup",
+  "claudeNotifier.asksQuestion.level": "sound+popup",
+
+  // Per-event sound preset (see list below)
+  "claudeNotifier.taskCompleted.sound": "Hero",
+  "claudeNotifier.needsPermission.sound": "Glass",
+  "claudeNotifier.asksQuestion.sound": "Funk"
+}
+```
+
+**Notification levels:**
+
+| Level         | Sound | OS notification | VSCode toast |
+| ------------- | ----- | --------------- | ------------ |
+| `sound+popup` | Yes   | Yes             | Yes          |
+| `sound`       | Yes   | No              | No           |
+| `popup`       | No    | Yes             | Yes          |
+| `off`         | No    | No              | No           |
+
+**Sound presets:**
+- macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
+- Windows: Windows Notify, tada, chimes, chord, ding, notify, ringin, Windows Background
+
+The global **mute toggle** (status bar speaker icon or `Claude Notifier: Toggle Sound` in the command palette) overrides all per-event settings.
+
 ## How it works
 
 Three [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) are registered:
 
-| Hook                           | Trigger                    | Sound |
-| ------------------------------ | -------------------------- | ----- |
-| `Stop`                         | Claude finishes responding | Hero  |
-| `PermissionRequest`            | Claude needs tool approval | Glass |
-| `PreToolUse` (AskUserQuestion) | Claude asks a question     | Funk  |
+| Hook                           | Trigger                    |
+| ------------------------------ | -------------------------- |
+| `Stop`                         | Claude finishes responding |
+| `PermissionRequest`            | Claude needs tool approval |
+| `PreToolUse` (AskUserQuestion) | Claude asks a question     |
 
-Each hook plays the appropriate system sound and shows an OS notification.
-If the VSCode extension is installed, it also shows a toast notification inside the editor.
+Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCode settings) to determine which sound to play and whether to show notifications.
 
-On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon notifications and Windows system sounds (with a fallback beep if sound files are missing).
+On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds.
 
-## Usage
+## Mute/unmute (CLI)
 
-- **Mute/unmute (VSCode):** Click the speaker icon in the status bar, or run `Claude Notifier: Toggle Sound` from the command palette
-- **Mute/unmute (CLI — macOS/Linux/WSL):**
-  ```sh
-  touch ~/.claude/hooks/claude-notifier-muted   # mute
-  rm ~/.claude/hooks/claude-notifier-muted      # unmute
-  ```
-- **Mute/unmute (CLI — Windows PowerShell):**
-  ```powershell
-  New-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted"   # mute
-  Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
-  ```
+**macOS / Linux / WSL:**
+
+```sh
+touch ~/.claude/hooks/claude-notifier-muted   # mute
+rm ~/.claude/hooks/claude-notifier-muted      # unmute
+```
+
+**Windows PowerShell:**
+
+```powershell
+New-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted"   # mute
+Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
+```
 
 ## Platform support
 
@@ -88,8 +114,6 @@ On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, ho
 | macOS    | Yes              | Yes         | Node.js                                                   |
 | Windows  | Yes              | VSCode only | PowerShell                                                |
 | WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
-
-## Issues and Updates
 
 ## License
 

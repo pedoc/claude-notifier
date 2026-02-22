@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "icon": "media/icon.png",
   "publisher": "SingularityInc",
   "repository": {
@@ -21,7 +21,66 @@
         "command": "claudeNotifier.toggleSound",
         "title": "Claude Notifier: Toggle Sound"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Claude Notifier",
+      "properties": {
+        "claudeNotifier.taskCompleted.level": {
+          "type": "string",
+          "enum": ["sound+popup", "sound", "popup", "off"],
+          "enumDescriptions": [
+            "Play sound and show notification",
+            "Play sound only",
+            "Show notification only",
+            "Disabled"
+          ],
+          "default": "sound+popup",
+          "description": "Notification level when Claude finishes a task."
+        },
+        "claudeNotifier.taskCompleted.sound": {
+          "type": "string",
+          "enum": ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink", "Windows Notify", "tada", "chimes", "chord", "ding", "notify", "ringin", "Windows Background"],
+          "default": "Hero",
+          "description": "Sound preset when Claude finishes a task. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        },
+        "claudeNotifier.needsPermission.level": {
+          "type": "string",
+          "enum": ["sound+popup", "sound", "popup", "off"],
+          "enumDescriptions": [
+            "Play sound and show notification",
+            "Play sound only",
+            "Show notification only",
+            "Disabled"
+          ],
+          "default": "sound+popup",
+          "description": "Notification level when Claude needs permission to use a tool."
+        },
+        "claudeNotifier.needsPermission.sound": {
+          "type": "string",
+          "enum": ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink", "Windows Notify", "tada", "chimes", "chord", "ding", "notify", "ringin", "Windows Background"],
+          "default": "Glass",
+          "description": "Sound preset when Claude needs permission. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        },
+        "claudeNotifier.asksQuestion.level": {
+          "type": "string",
+          "enum": ["sound+popup", "sound", "popup", "off"],
+          "enumDescriptions": [
+            "Play sound and show notification",
+            "Play sound only",
+            "Show notification only",
+            "Disabled"
+          ],
+          "default": "sound+popup",
+          "description": "Notification level when Claude asks you a question."
+        },
+        "claudeNotifier.asksQuestion.sound": {
+          "type": "string",
+          "enum": ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink", "Windows Notify", "tada", "chimes", "chord", "ding", "notify", "ringin", "Windows Background"],
+          "default": "Funk",
+          "description": "Sound preset when Claude asks a question. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

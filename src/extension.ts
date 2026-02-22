@@ -12,6 +12,7 @@ const PERMISSION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-permission${HOO
 const QUESTION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-question${HOOK_EXT}`);
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
+const CONFIG_FILE = path.join(HOOKS_DIR, "claude-notifier-config.json");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
 function hookCmd(hookPath: string): string {
@@ -29,6 +30,7 @@ let soundEnabled = true;
 
 export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
+  syncConfig();
 
   soundEnabled = !fs.existsSync(MUTE_FLAG);
 
@@ -62,6 +64,13 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(toggleCmd);
 
+  const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration("claudeNotifier")) {
+      syncConfig();
+    }
+  });
+  context.subscriptions.push(configListener);
+
   watcher = fs.watch(SIGNAL_FILE, (eventType) => {
     if (eventType === "change") {
       handleSignal();
@@ -75,6 +84,37 @@ function updateStatusBar() {
   statusBarItem.tooltip = `Claude Notifier — sound ${soundEnabled ? "on" : "off"} (click to toggle)`;
 }
 
+function syncConfig() {
+  const cfg = vscode.workspace.getConfiguration("claudeNotifier");
+  const config = {
+    taskCompleted: {
+      level: cfg.get<string>("taskCompleted.level", "sound+popup"),
+      sound: cfg.get<string>("taskCompleted.sound", "Hero"),
+    },
+    needsPermission: {
+      level: cfg.get<string>("needsPermission.level", "sound+popup"),
+      sound: cfg.get<string>("needsPermission.sound", "Glass"),
+    },
+    asksQuestion: {
+      level: cfg.get<string>("asksQuestion.level", "sound+popup"),
+      sound: cfg.get<string>("asksQuestion.sound", "Funk"),
+    },
+  };
+  try {
+    fs.mkdirSync(HOOKS_DIR, { recursive: true });
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n");
+  } catch {}
+}
+
+function getEventLevel(eventKey: string): string {
+  try {
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    return config[eventKey]?.level ?? "sound+popup";
+  } catch {
+    return "sound+popup";
+  }
+}
+
 function handleSignal() {
   let content = "";
   try {
@@ -86,11 +126,20 @@ function handleSignal() {
   const reason = content.split(" ")[0];
 
   if (reason === "input") {
-    vscode.window.showInformationMessage("Claude needs your permission.");
+    const level = getEventLevel("needsPermission");
+    if (level === "sound+popup" || level === "popup") {
+      vscode.window.showInformationMessage("Claude needs your permission.");
+    }
   } else if (reason === "question") {
-    vscode.window.showInformationMessage("Claude is asking you a question.");
+    const level = getEventLevel("asksQuestion");
+    if (level === "sound+popup" || level === "popup") {
+      vscode.window.showInformationMessage("Claude is asking you a question.");
+    }
   } else if (reason === "done") {
-    vscode.window.showInformationMessage("Claude has finished the task.");
+    const level = getEventLevel("taskCompleted");
+    if (level === "sound+popup" || level === "popup") {
+      vscode.window.showInformationMessage("Claude has finished the task.");
+    }
   }
 }
 
@@ -169,7 +218,7 @@ function setupHooks(context: vscode.ExtensionContext) {
 }
 
 function teardownHooks() {
-  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG]) {
+  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE]) {
     try { fs.unlinkSync(file); } catch {}
   }
   // Clean up legacy and cross-platform hook files
