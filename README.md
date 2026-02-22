@@ -117,4 +117,4 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 
 ## License
 
-MIT
+[GPL-3.0](LICENSE.md)
