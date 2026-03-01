@@ -65,6 +65,15 @@ process.stdin.on("end", () => {
 
   if (level === "off") process.exit(0);
 
+  // Duration threshold check — skip sound if task is still short (user is watching)
+  const threshold = config?.durationThreshold ?? 0;
+  if (threshold > 0) {
+    let startTime = 0;
+    try { startTime = parseInt(fs.readFileSync(TASKSTART_FILE, "utf-8").trim(), 10); } catch {}
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed < threshold) process.exit(0);
+  }
+
   const sound = resolveSound(eventCfg.sound, "/System/Library/Sounds/Glass.aiff", "C:\\Windows\\Media\\Windows Notify.wav");
 
   // Play sound

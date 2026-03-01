@@ -92,7 +92,7 @@ Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add 
 
 **Duration threshold:**
 
-Set `claudeNotifier.durationThreshold` to a number of seconds. The "task completed" sound will only play if Claude worked for at least that long. This is useful if you don't want to be pinged for quick responses. Set to `0` (default) to always notify. Permission and question notifications are not affected — they always fire immediately since they require your input.
+Set `claudeNotifier.durationThreshold` to a number of seconds. All notification sounds (task completed, permission, and question) will only play if Claude has been working for at least that long. This is useful when you're actively watching the IDE and don't need audio alerts for quick interactions. Set to `0` (default) to always notify.
 
 **Sound presets:**
 - macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink

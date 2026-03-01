@@ -96,16 +96,15 @@ process.stdin.on("end", () => {
     process.exit(0);
   }
 
-  // Duration threshold check — only skip for "done" events, not "question"
+  // Duration threshold check — suppress all sounds if task is shorter than threshold
   const threshold = config?.durationThreshold ?? 0;
-  if (reason === "done" && threshold > 0) {
+  if (threshold > 0) {
     let startTime = 0;
     try { startTime = parseInt(fs.readFileSync(TASKSTART_FILE, "utf-8").trim(), 10); } catch {}
     try { fs.unlinkSync(TASKSTART_FILE); } catch {}
-    if (startTime > 0) {
-      const elapsed = (Date.now() - startTime) / 1000;
-      if (elapsed < threshold) process.exit(0);
-    }
+    if (startTime <= 0) process.exit(0); // no marker = quick response, user is still watching
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed < threshold) process.exit(0);
   } else {
     try { fs.unlinkSync(TASKSTART_FILE); } catch {}
   }

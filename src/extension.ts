@@ -175,12 +175,19 @@ function setupHooks(context: vscode.ExtensionContext) {
       entry.hooks?.some((h: any) => h.command?.includes(needle) && h.command?.startsWith(expectedPrefix))
     );
 
+  // PreToolUse must fire for ALL tools (no matcher) to track task start time.
+  // If it has a matcher (legacy), force re-registration.
+  const preToolUseNeedsFix = settings.hooks?.PreToolUse?.some((entry: any) =>
+    entry.matcher && entry.hooks?.some((h: any) => h.command?.includes("claude-notifier-on-question"))
+  );
+
   if (
+    !preToolUseNeedsFix &&
     hasHook("Stop", "claude-notifier-on-stop") &&
     hasHook("PermissionRequest", "claude-notifier-on-permission") &&
     hasHook("PreToolUse", "claude-notifier-on-question")
   ) {
-    return; // Already configured with correct runner, don't touch settings.json
+    return; // Already configured correctly, don't touch settings.json
   }
 
   if (!settings.hooks) {
@@ -211,10 +218,9 @@ function setupHooks(context: vscode.ExtensionContext) {
     hooks: [{ type: "command", command: hookCmd(PERMISSION_HOOK) }],
   });
 
-  // PreToolUse hook — question asked
+  // PreToolUse hook — tracks task start time for all tools, plays sound for AskUserQuestion
   if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
   settings.hooks.PreToolUse.push({
-    matcher: "AskUserQuestion",
     hooks: [{ type: "command", command: hookCmd(QUESTION_HOOK) }],
   });
 

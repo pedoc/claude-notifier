@@ -37,6 +37,18 @@ $level = if ($eventCfg -and $eventCfg.level) { $eventCfg.level } else { 'sound+p
 
 if ($level -eq 'off') { exit 0 }
 
+# Duration threshold check — skip sound if task is still short (user is watching)
+$threshold = if ($config -and $config.durationThreshold) { $config.durationThreshold } else { 0 }
+if ($threshold -gt 0) {
+    $startTime = 0
+    if (Test-Path $taskStartFile) {
+        try { $startTime = [long](Get-Content $taskStartFile -Raw).Trim() } catch {}
+    }
+    $nowMs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+    $elapsed = ($nowMs - $startTime) / 1000
+    if ($elapsed -lt $threshold) { exit 0 }
+}
+
 $soundName = if ($eventCfg -and $eventCfg.sound) { $eventCfg.sound } else { '' }
 $soundPath = if ($winSounds.ContainsKey($soundName)) { $winSounds[$soundName] } else { 'C:\Windows\Media\Windows Notify.wav' }
 

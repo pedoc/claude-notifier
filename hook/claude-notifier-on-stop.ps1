@@ -60,19 +60,18 @@ if ($level -eq 'off') {
     exit 0
 }
 
-# Duration threshold check — only skip for "done" events, not "question"
+# Duration threshold check — suppress all sounds if task is shorter than threshold
 $threshold = if ($config -and $config.durationThreshold) { $config.durationThreshold } else { 0 }
-if ($reason -eq 'done' -and $threshold -gt 0) {
+if ($threshold -gt 0) {
     $startTime = 0
     if (Test-Path $taskStartFile) {
         try { $startTime = [long](Get-Content $taskStartFile -Raw).Trim() } catch {}
     }
     Remove-Item -Path $taskStartFile -Force -ErrorAction SilentlyContinue
-    if ($startTime -gt 0) {
-        $nowMs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
-        $elapsed = ($nowMs - $startTime) / 1000
-        if ($elapsed -lt $threshold) { exit 0 }
-    }
+    if ($startTime -le 0) { exit 0 } # no marker = quick response, user is still watching
+    $nowMs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+    $elapsed = ($nowMs - $startTime) / 1000
+    if ($elapsed -lt $threshold) { exit 0 }
 } else {
     Remove-Item -Path $taskStartFile -Force -ErrorAction SilentlyContinue
 }

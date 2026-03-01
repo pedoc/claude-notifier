@@ -28,6 +28,9 @@ if (-not (Test-Path $taskStartFile)) {
     try { Set-Content -Path $taskStartFile -Value ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -NoNewline } catch {}
 }
 
+# Only play question sound for AskUserQuestion; other tools just need the marker above
+if ($data.tool_name -ne 'AskUserQuestion') { exit 0 }
+
 # Read config
 $config = $null
 try { $config = (Get-Content $configFile -Raw) | ConvertFrom-Json } catch {}
@@ -36,6 +39,18 @@ $eventCfg = if ($config -and $config.asksQuestion) { $config.asksQuestion } else
 $level = if ($eventCfg -and $eventCfg.level) { $eventCfg.level } else { 'sound+popup' }
 
 if ($level -eq 'off') { exit 0 }
+
+# Duration threshold check — skip sound if task is still short (user is watching)
+$threshold = if ($config -and $config.durationThreshold) { $config.durationThreshold } else { 0 }
+if ($threshold -gt 0) {
+    $startTime = 0
+    if (Test-Path $taskStartFile) {
+        try { $startTime = [long](Get-Content $taskStartFile -Raw).Trim() } catch {}
+    }
+    $nowMs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+    $elapsed = ($nowMs - $startTime) / 1000
+    if ($elapsed -lt $threshold) { exit 0 }
+}
 
 $soundName = if ($eventCfg -and $eventCfg.sound) { $eventCfg.sound } else { '' }
 $soundPath = if ($winSounds.ContainsKey($soundName)) { $winSounds[$soundName] } else { 'C:\Windows\Media\Windows Notify.wav' }

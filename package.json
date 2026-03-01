@@ -83,7 +83,7 @@
           "type": "number",
           "default": 0,
           "minimum": 0,
-          "description": "Minimum task duration (seconds) before playing the completion sound. Set to 0 to always notify. For example, set to 10 to only get notified when Claude works for 10+ seconds."
+          "description": "Minimum task duration (seconds) before playing any notification sound. Set to 0 to always notify. For example, set to 10 to only get notified when Claude works for 10+ seconds."
         }
       }
     }
