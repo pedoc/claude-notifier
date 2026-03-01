@@ -5,6 +5,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $hooksDir = Join-Path ($env:USERPROFILE) '.claude' 'hooks'
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
+$taskStartFile = Join-Path $hooksDir 'claude-notifier-taskstart'
 
 $winSounds = @{
     'Windows Notify' = 'C:\Windows\Media\Windows Notify.wav'
@@ -54,7 +55,27 @@ $configKey = if ($reason -eq 'question') { 'asksQuestion' } else { 'taskComplete
 $eventCfg = if ($config -and $config.$configKey) { $config.$configKey } else { $null }
 $level = if ($eventCfg -and $eventCfg.level) { $eventCfg.level } else { 'sound+popup' }
 
-if ($level -eq 'off') { exit 0 }
+if ($level -eq 'off') {
+    Remove-Item -Path $taskStartFile -Force -ErrorAction SilentlyContinue
+    exit 0
+}
+
+# Duration threshold check — only skip for "done" events, not "question"
+$threshold = if ($config -and $config.durationThreshold) { $config.durationThreshold } else { 0 }
+if ($reason -eq 'done' -and $threshold -gt 0) {
+    $startTime = 0
+    if (Test-Path $taskStartFile) {
+        try { $startTime = [long](Get-Content $taskStartFile -Raw).Trim() } catch {}
+    }
+    Remove-Item -Path $taskStartFile -Force -ErrorAction SilentlyContinue
+    if ($startTime -gt 0) {
+        $nowMs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+        $elapsed = ($nowMs - $startTime) / 1000
+        if ($elapsed -lt $threshold) { exit 0 }
+    }
+} else {
+    Remove-Item -Path $taskStartFile -Force -ErrorAction SilentlyContinue
+}
 
 $defaultSounds = @{ question = 'C:\Windows\Media\Windows Notify.wav'; done = 'C:\Windows\Media\tada.wav' }
 $soundName = if ($eventCfg -and $eventCfg.sound) { $eventCfg.sound } else { '' }

@@ -5,6 +5,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $hooksDir = Join-Path ($env:USERPROFILE) '.claude' 'hooks'
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
+$taskStartFile = Join-Path $hooksDir 'claude-notifier-taskstart'
 
 $winSounds = @{
     'Windows Notify' = 'C:\Windows\Media\Windows Notify.wav'
@@ -21,6 +22,11 @@ $raw = [Console]::In.ReadToEnd()
 try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 
 if (Test-Path $muteFlag) { exit 0 }
+
+# Write task-start marker for duration threshold (only if not already set)
+if (-not (Test-Path $taskStartFile)) {
+    try { Set-Content -Path $taskStartFile -Value ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -NoNewline } catch {}
+}
 
 # Read config
 $config = $null

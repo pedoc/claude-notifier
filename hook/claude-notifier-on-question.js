@@ -7,6 +7,8 @@ const { execSync } = require("child_process");
 
 const HOOKS_DIR = path.join(process.env.HOME || process.env.USERPROFILE || "~", ".claude", "hooks");
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
+const TASKSTART_FILE = path.join(HOOKS_DIR, "claude-notifier-taskstart");
+
 const IS_WIN = process.platform === "win32";
 const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
   try { return fs.readFileSync("/proc/version", "utf-8").toLowerCase().includes("microsoft"); } catch { return false; }
@@ -48,6 +50,11 @@ process.stdin.on("end", () => {
   try { input = JSON.parse(raw); } catch { process.exit(0); }
 
   if (fs.existsSync(MUTE_FLAG)) process.exit(0);
+
+  // Write task-start marker for duration threshold (only if not already set)
+  if (!fs.existsSync(TASKSTART_FILE)) {
+    try { fs.writeFileSync(TASKSTART_FILE, String(Date.now())); } catch {}
+  }
 
   const config = readConfig();
   const eventCfg = config?.asksQuestion ?? {};

@@ -7,6 +7,8 @@ const { execSync } = require("child_process");
 
 const HOOKS_DIR = path.join(process.env.HOME || process.env.USERPROFILE || "~", ".claude", "hooks");
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
+const TASKSTART_FILE = path.join(HOOKS_DIR, "claude-notifier-taskstart");
+
 const IS_WIN = process.platform === "win32";
 const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
   try { return fs.readFileSync("/proc/version", "utf-8").toLowerCase().includes("microsoft"); } catch { return false; }
@@ -89,7 +91,24 @@ process.stdin.on("end", () => {
   const eventCfg = config?.[configKey] ?? {};
   const level = eventCfg.level ?? "sound+popup";
 
-  if (level === "off") process.exit(0);
+  if (level === "off") {
+    try { fs.unlinkSync(TASKSTART_FILE); } catch {}
+    process.exit(0);
+  }
+
+  // Duration threshold check — only skip for "done" events, not "question"
+  const threshold = config?.durationThreshold ?? 0;
+  if (reason === "done" && threshold > 0) {
+    let startTime = 0;
+    try { startTime = parseInt(fs.readFileSync(TASKSTART_FILE, "utf-8").trim(), 10); } catch {}
+    try { fs.unlinkSync(TASKSTART_FILE); } catch {}
+    if (startTime > 0) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed < threshold) process.exit(0);
+    }
+  } else {
+    try { fs.unlinkSync(TASKSTART_FILE); } catch {}
+  }
 
   const sound = resolveSound(eventCfg.sound, DEFAULT_SOUNDS[reason].mac, DEFAULT_SOUNDS[reason].win);
 

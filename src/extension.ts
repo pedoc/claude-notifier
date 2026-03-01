@@ -13,6 +13,7 @@ const QUESTION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-question${HOOK_EX
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
 const CONFIG_FILE = path.join(HOOKS_DIR, "claude-notifier-config.json");
+const TASKSTART_FILE = path.join(HOOKS_DIR, "claude-notifier-taskstart");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
 function hookCmd(hookPath: string): string {
@@ -81,7 +82,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 function updateStatusBar() {
   statusBarItem.text = soundEnabled ? "$(unmute) Claude" : "$(mute) Claude";
-  statusBarItem.tooltip = `Claude Notifier — sound ${soundEnabled ? "on" : "off"} (click to toggle)`;
+  const threshold = vscode.workspace.getConfiguration("claudeNotifier").get<number>("durationThreshold", 0);
+  const thresholdInfo = threshold > 0 ? ` | threshold: ${threshold}s` : "";
+  statusBarItem.tooltip = `Claude Notifier — sound ${soundEnabled ? "on" : "off"}${thresholdInfo} (click to toggle)`;
 }
 
 function syncConfig() {
@@ -99,6 +102,7 @@ function syncConfig() {
       level: cfg.get<string>("asksQuestion.level", "sound+popup"),
       sound: cfg.get<string>("asksQuestion.sound", "Funk"),
     },
+    durationThreshold: cfg.get<number>("durationThreshold", 0),
   };
   try {
     fs.mkdirSync(HOOKS_DIR, { recursive: true });
@@ -218,7 +222,7 @@ function setupHooks(context: vscode.ExtensionContext) {
 }
 
 function teardownHooks() {
-  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE]) {
+  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE, TASKSTART_FILE]) {
     try { fs.unlinkSync(file); } catch {}
   }
   // Clean up legacy and cross-platform hook files

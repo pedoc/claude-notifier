@@ -74,7 +74,10 @@ Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add 
   // Per-event sound preset (see list below)
   "claudeNotifier.taskCompleted.sound": "Hero",
   "claudeNotifier.needsPermission.sound": "Glass",
-  "claudeNotifier.asksQuestion.sound": "Funk"
+  "claudeNotifier.asksQuestion.sound": "Funk",
+
+  // Only notify when Claude works longer than this many seconds (0 = always)
+  "claudeNotifier.durationThreshold": 0
 }
 ```
 
@@ -86,6 +89,10 @@ Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add 
 | `sound`       | Yes   | No              | No           |
 | `popup`       | No    | Yes             | Yes          |
 | `off`         | No    | No              | No           |
+
+**Duration threshold:**
+
+Set `claudeNotifier.durationThreshold` to a number of seconds. The "task completed" sound will only play if Claude worked for at least that long. This is useful if you don't want to be pinged for quick responses. Set to `0` (default) to always notify. Permission and question notifications are not affected — they always fire immediately since they require your input.
 
 **Sound presets:**
 - macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink

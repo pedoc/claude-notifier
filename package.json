@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "icon": "media/icon.png",
   "publisher": "SingularityInc",
   "repository": {
@@ -78,6 +78,12 @@
           "enum": ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink", "Windows Notify", "tada", "chimes", "chord", "ding", "notify", "ringin", "Windows Background"],
           "default": "Funk",
           "description": "Sound preset when Claude asks a question. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        },
+        "claudeNotifier.durationThreshold": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Minimum task duration (seconds) before playing the completion sound. Set to 0 to always notify. For example, set to 10 to only get notified when Claude works for 10+ seconds."
         }
       }
     }
