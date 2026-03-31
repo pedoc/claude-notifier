@@ -2,7 +2,7 @@
 # Plays sound when Claude sends a notification.
 $ErrorActionPreference = 'SilentlyContinue'
 
-$hooksDir = Join-Path ($env:USERPROFILE) '.claude' 'hooks'
+$hooksDir = $PSScriptRoot
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
 
 $raw = [Console]::In.ReadToEnd()
