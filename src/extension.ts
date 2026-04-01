@@ -28,6 +28,99 @@ let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
 
+// Synthesized tone presets for remote sound playback via Web Audio API.
+// When VS Code is connected to a remote host, afplay/osascript can't run on the
+// server. Instead we create a short-lived webview (which renders locally) that
+// plays a synthesized tone using the Web Audio API.
+interface ToneConfig {
+  freqs: number[];
+  durationMs: number;
+  waveform: string;
+}
+
+const TONE_PRESETS: Record<string, ToneConfig> = {
+  Basso:     { freqs: [220, 165],       durationMs: 300, waveform: "sine"     },
+  Blow:      { freqs: [600, 800],       durationMs: 200, waveform: "sine"     },
+  Bottle:    { freqs: [600],            durationMs: 200, waveform: "square"   },
+  Frog:      { freqs: [150, 200],       durationMs: 250, waveform: "triangle" },
+  Funk:      { freqs: [300, 400],       durationMs: 200, waveform: "sine"     },
+  Glass:     { freqs: [1200],           durationMs: 150, waveform: "sine"     },
+  Hero:      { freqs: [523, 659],       durationMs: 200, waveform: "sine"     },
+  Morse:     { freqs: [600, 600, 600],  durationMs:  80, waveform: "sine"     },
+  Ping:      { freqs: [880],            durationMs: 200, waveform: "sine"     },
+  Pop:       { freqs: [800],            durationMs:  50, waveform: "sine"     },
+  Purr:      { freqs: [100],            durationMs: 400, waveform: "sine"     },
+  Sosumi:    { freqs: [440, 349, 262],  durationMs: 150, waveform: "sine"     },
+  Submarine: { freqs: [400, 400],       durationMs: 100, waveform: "sine"     },
+  Tink:      { freqs: [1400],           durationMs:  80, waveform: "sine"     },
+  "Windows Notify":    { freqs: [880, 1100],      durationMs: 150, waveform: "sine" },
+  "tada":              { freqs: [523, 659, 784],  durationMs: 150, waveform: "sine" },
+  "chimes":            { freqs: [784, 988, 1175], durationMs: 200, waveform: "sine" },
+  "chord":             { freqs: [523, 659, 784],  durationMs: 300, waveform: "sine" },
+  "ding":              { freqs: [880],             durationMs: 200, waveform: "sine" },
+  "notify":            { freqs: [660, 880],        durationMs: 150, waveform: "sine" },
+  "ringin":            { freqs: [880, 988, 880],   durationMs: 150, waveform: "sine" },
+  "Windows Background":{ freqs: [440, 550, 660],  durationMs: 200, waveform: "sine" },
+};
+
+function getConfiguredSound(eventKey: string): string {
+  try {
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    return config[eventKey]?.sound ?? "Ping";
+  } catch {
+    return "Ping";
+  }
+}
+
+function playRemoteSound(soundName: string) {
+  const tone = TONE_PRESETS[soundName] ?? { freqs: [880], durationMs: 200, waveform: "sine" };
+  const totalMs = tone.freqs.length * (tone.durationMs + 20) + 600;
+  const panel = vscode.window.createWebviewPanel(
+    "claudeNotifierAudio",
+    "",
+    { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
+    { enableScripts: true }
+  );
+  panel.webview.html = `<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline';">
+</head>
+<body>
+<script>
+(function() {
+  var vscode = acquireVsCodeApi();
+  var ctx = new AudioContext();
+  var freqs = ${JSON.stringify(tone.freqs)};
+  var duration = ${tone.durationMs};
+  var waveform = ${JSON.stringify(tone.waveform)};
+  var t = ctx.currentTime;
+  freqs.forEach(function(freq) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = waveform;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.35, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration / 1000);
+    osc.start(t);
+    osc.stop(t + duration / 1000 + 0.05);
+    t += duration / 1000 + 0.02;
+  });
+  setTimeout(function() { vscode.postMessage({ type: "done" }); }, ${totalMs});
+})();
+</script>
+</body>
+</html>`;
+  const sub = panel.webview.onDidReceiveMessage(() => {
+    sub.dispose();
+    try { panel.dispose(); } catch {}
+  });
+  setTimeout(() => { try { panel.dispose(); } catch {} }, totalMs + 1000);
+}
+
 export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
   syncConfig();
@@ -124,19 +217,32 @@ function handleSignal() {
   }
 
   const reason = content.split(" ")[0];
+  // When running on a remote host the extension process is on the server and
+  // cannot play audio. VS Code webviews always render in the local renderer, so
+  // we synthesize a tone there instead.
+  const isRemote = !!vscode.env.remoteName;
 
   if (reason === "input") {
     const level = getEventLevel("needsPermission");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound(getConfiguredSound("needsPermission"));
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude needs your permission.");
     }
   } else if (reason === "question") {
     const level = getEventLevel("asksQuestion");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound(getConfiguredSound("asksQuestion"));
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude is asking you a question.");
     }
   } else if (reason === "done") {
     const level = getEventLevel("taskCompleted");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound(getConfiguredSound("taskCompleted"));
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude has finished the task.");
     }
