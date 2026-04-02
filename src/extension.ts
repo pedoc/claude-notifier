@@ -28,51 +28,7 @@ let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
 
-// Synthesized tone presets for remote sound playback via Web Audio API.
-// When VS Code is connected to a remote host, afplay/osascript can't run on the
-// server. Instead we create a short-lived webview (which renders locally) that
-// plays a synthesized tone using the Web Audio API.
-interface ToneConfig {
-  freqs: number[];
-  durationMs: number;
-  waveform: string;
-}
-
-const TONE_PRESETS: Record<string, ToneConfig> = {
-  Basso:     { freqs: [220, 165],       durationMs: 300, waveform: "sine"     },
-  Blow:      { freqs: [600, 800],       durationMs: 200, waveform: "sine"     },
-  Bottle:    { freqs: [600],            durationMs: 200, waveform: "square"   },
-  Frog:      { freqs: [150, 200],       durationMs: 250, waveform: "triangle" },
-  Funk:      { freqs: [300, 400],       durationMs: 200, waveform: "sine"     },
-  Glass:     { freqs: [1200],           durationMs: 150, waveform: "sine"     },
-  Hero:      { freqs: [523, 659],       durationMs: 200, waveform: "sine"     },
-  Morse:     { freqs: [600, 600, 600],  durationMs:  80, waveform: "sine"     },
-  Ping:      { freqs: [880],            durationMs: 200, waveform: "sine"     },
-  Pop:       { freqs: [800],            durationMs:  50, waveform: "sine"     },
-  Purr:      { freqs: [100],            durationMs: 400, waveform: "sine"     },
-  Sosumi:    { freqs: [440, 349, 262],  durationMs: 150, waveform: "sine"     },
-  Submarine: { freqs: [400, 400],       durationMs: 100, waveform: "sine"     },
-  Tink:      { freqs: [1400],           durationMs:  80, waveform: "sine"     },
-  "Windows Notify":    { freqs: [880, 1100],      durationMs: 150, waveform: "sine" },
-  "tada":              { freqs: [523, 659, 784],  durationMs: 150, waveform: "sine" },
-  "chimes":            { freqs: [784, 988, 1175], durationMs: 200, waveform: "sine" },
-  "chord":             { freqs: [523, 659, 784],  durationMs: 300, waveform: "sine" },
-  "ding":              { freqs: [880],             durationMs: 200, waveform: "sine" },
-  "notify":            { freqs: [660, 880],        durationMs: 150, waveform: "sine" },
-  "ringin":            { freqs: [880, 988, 880],   durationMs: 150, waveform: "sine" },
-  "Windows Background":{ freqs: [440, 550, 660],  durationMs: 200, waveform: "sine" },
-};
-
-function getConfiguredSound(eventKey: string): string {
-  try {
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-    return config[eventKey]?.sound ?? "Ping";
-  } catch {
-    return "Ping";
-  }
-}
-
-function playRemoteSound(_soundName: string) {
+function playRemoteSound() {
   // In remote sessions, webview audio is blocked by Electron's autoplay policy.
   // Use the terminal bell instead — VS Code forwards BEL to the local client.
   // Ensure terminal bell is enabled in VS Code settings.
@@ -189,7 +145,7 @@ function handleSignal() {
   if (reason === "input") {
     const level = getEventLevel("needsPermission");
     if (isRemote && (level === "sound+popup" || level === "sound")) {
-      playRemoteSound(getConfiguredSound("needsPermission"));
+      playRemoteSound();
     }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude needs your permission.");
@@ -197,7 +153,7 @@ function handleSignal() {
   } else if (reason === "question") {
     const level = getEventLevel("asksQuestion");
     if (isRemote && (level === "sound+popup" || level === "sound")) {
-      playRemoteSound(getConfiguredSound("asksQuestion"));
+      playRemoteSound();
     }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude is asking you a question.");
@@ -205,7 +161,7 @@ function handleSignal() {
   } else if (reason === "done") {
     const level = getEventLevel("taskCompleted");
     if (isRemote && (level === "sound+popup" || level === "sound")) {
-      playRemoteSound(getConfiguredSound("taskCompleted"));
+      playRemoteSound();
     }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude has finished the task.");
