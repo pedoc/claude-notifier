@@ -72,53 +72,17 @@ function getConfiguredSound(eventKey: string): string {
   }
 }
 
-function playRemoteSound(soundName: string) {
-  const tone = TONE_PRESETS[soundName] ?? { freqs: [880], durationMs: 200, waveform: "sine" };
-  const totalMs = tone.freqs.length * (tone.durationMs + 20) + 600;
-  const panel = vscode.window.createWebviewPanel(
-    "claudeNotifierAudio",
-    "",
-    { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
-    { enableScripts: true }
-  );
-  panel.webview.html = `<!DOCTYPE html>
-<html>
-<head>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline';">
-</head>
-<body>
-<script>
-(function() {
-  var vscode = acquireVsCodeApi();
-  var ctx = new AudioContext();
-  var freqs = ${JSON.stringify(tone.freqs)};
-  var duration = ${tone.durationMs};
-  var waveform = ${JSON.stringify(tone.waveform)};
-  var t = ctx.currentTime;
-  freqs.forEach(function(freq) {
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = waveform;
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.35, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + duration / 1000);
-    osc.start(t);
-    osc.stop(t + duration / 1000 + 0.05);
-    t += duration / 1000 + 0.02;
+function playRemoteSound(_soundName: string) {
+  // In remote sessions, webview audio is blocked by Electron's autoplay policy.
+  // Use the terminal bell instead — VS Code forwards BEL to the local client.
+  // Ensure terminal bell is enabled in VS Code settings.
+  const bellConfig = vscode.workspace.getConfiguration("terminal.integrated");
+  if (!bellConfig.get<boolean>("enableBell")) {
+    bellConfig.update("enableBell", true, vscode.ConfigurationTarget.Global);
+  }
+  vscode.commands.executeCommand("workbench.action.terminal.sendSequence", {
+    text: "\u0007",
   });
-  setTimeout(function() { vscode.postMessage({ type: "done" }); }, ${totalMs});
-})();
-</script>
-</body>
-</html>`;
-  const sub = panel.webview.onDidReceiveMessage(() => {
-    sub.dispose();
-    try { panel.dispose(); } catch {}
-  });
-  setTimeout(() => { try { panel.dispose(); } catch {} }, totalMs + 1000);
 }
 
 export function activate(context: vscode.ExtensionContext) {
