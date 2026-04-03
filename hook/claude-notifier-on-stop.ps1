@@ -2,7 +2,7 @@
 # Plays "task completed" or "question asked" sound when Claude finishes.
 $ErrorActionPreference = 'SilentlyContinue'
 
-$hooksDir = Join-Path ($env:USERPROFILE) '.claude' 'hooks'
+$hooksDir = $PSScriptRoot
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
 
