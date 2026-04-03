@@ -28,6 +28,19 @@ let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
 
+function playRemoteSound() {
+  // In remote sessions, webview audio is blocked by Electron's autoplay policy.
+  // Use the terminal bell instead — VS Code forwards BEL to the local client.
+  // Ensure terminal bell is enabled in VS Code settings.
+  const bellConfig = vscode.workspace.getConfiguration("terminal.integrated");
+  if (!bellConfig.get<boolean>("enableBell")) {
+    bellConfig.update("enableBell", true, vscode.ConfigurationTarget.Global);
+  }
+  vscode.commands.executeCommand("workbench.action.terminal.sendSequence", {
+    text: "\u0007",
+  });
+}
+
 export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
   syncConfig();
@@ -124,19 +137,32 @@ function handleSignal() {
   }
 
   const reason = content.split(" ")[0];
+  // When running on a remote host the extension process is on the server and
+  // cannot play audio. VS Code webviews always render in the local renderer, so
+  // we synthesize a tone there instead.
+  const isRemote = !!vscode.env.remoteName;
 
   if (reason === "input") {
     const level = getEventLevel("needsPermission");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound();
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude needs your permission.");
     }
   } else if (reason === "question") {
     const level = getEventLevel("asksQuestion");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound();
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude is asking you a question.");
     }
   } else if (reason === "done") {
     const level = getEventLevel("taskCompleted");
+    if (isRemote && (level === "sound+popup" || level === "sound")) {
+      playRemoteSound();
+    }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude has finished the task.");
     }
