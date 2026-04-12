@@ -192,15 +192,16 @@ function setupHooks(context: vscode.ExtensionContext) {
   // Check if our hooks are already configured with the right runner — skip if so
   const settings = readSettings();
   const expectedPrefix = IS_WIN ? "powershell" : "node";
-  const hasHook = (type: string, needle: string) =>
+  const hasHook = (type: string, needle: string, matcher?: string) =>
     settings.hooks?.[type]?.some((entry: any) =>
+      (matcher === undefined || entry.matcher === matcher) &&
       entry.hooks?.some((h: any) => h.command?.includes(needle) && h.command?.startsWith(expectedPrefix))
     );
 
   if (
     hasHook("Stop", "claude-notifier-on-stop") &&
     hasHook("PermissionRequest", "claude-notifier-on-permission") &&
-    hasHook("PreToolUse", "claude-notifier-on-question")
+    hasHook("PreToolUse", "claude-notifier-on-question", "AskUserQuestion")
   ) {
     return; // Already configured with correct runner, don't touch settings.json
   }

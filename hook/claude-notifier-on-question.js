@@ -47,6 +47,9 @@ process.stdin.on("end", () => {
   let input = {};
   try { input = JSON.parse(raw); } catch { process.exit(0); }
 
+  // Defense-in-depth: bail if a misconfigured matcher routes other tools here.
+  if (input.tool_name !== "AskUserQuestion") process.exit(0);
+
   if (fs.existsSync(MUTE_FLAG)) process.exit(0);
 
   const config = readConfig();
