@@ -6,8 +6,22 @@ $ErrorActionPreference = 'SilentlyContinue'
 $hooksDir = $PSScriptRoot
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
 $signalFile = Join-Path $hooksDir 'claude-signal'
-$activeFlag = Join-Path $hooksDir 'claude-notifier-active'
+$activeDir  = Join-Path $hooksDir 'claude-notifier-active.d'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
+
+# Extension writes one PID marker file per window into $activeDir. Only
+# treat the extension as active when a marker names a live process, so a
+# stale marker from a crashed window doesn't silence terminal fallback.
+function Test-ExtensionActive {
+    if (-not (Test-Path $activeDir)) { return $false }
+    foreach ($f in Get-ChildItem -Path $activeDir -File -ErrorAction SilentlyContinue) {
+        $pidVal = 0
+        if ([int]::TryParse($f.Name, [ref]$pidVal)) {
+            if (Get-Process -Id $pidVal -ErrorAction SilentlyContinue) { return $true }
+        }
+    }
+    return $false
+}
 
 $winSounds = @{
     'Windows Notify' = 'C:\Windows\Media\Windows Notify.wav'
@@ -33,7 +47,7 @@ try {
 
 # If the extension is active it handles sound/notification with debounce.
 # Only play directly when running in terminal without the extension.
-if (Test-Path $activeFlag) { exit 0 }
+if (Test-ExtensionActive) { exit 0 }
 
 $config = $null
 try { $config = (Get-Content $configFile -Raw) | ConvertFrom-Json } catch {}

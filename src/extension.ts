@@ -13,7 +13,12 @@ const PERMISSION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-permission${HOO
 const QUESTION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-question${HOOK_EXT}`);
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
-const ACTIVE_FLAG = path.join(HOOKS_DIR, "claude-notifier-active");
+// Directory of per-PID marker files. Hooks treat the extension as active if
+// any marker inside corresponds to a live PID. Using a directory (instead of a
+// single flag file) lets multiple VSCode windows coexist and survives crashes:
+// stale markers get cleaned up on next activate and ignored via PID liveness.
+const ACTIVE_DIR = path.join(HOOKS_DIR, "claude-notifier-active.d");
+const OWN_PID_FILE = path.join(ACTIVE_DIR, String(process.pid));
 const CONFIG_FILE = path.join(HOOKS_DIR, "claude-notifier-config.json");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
 
@@ -68,6 +73,31 @@ let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
 let doneDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+function isPidAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function cleanStalePidFiles() {
+  try {
+    for (const name of fs.readdirSync(ACTIVE_DIR)) {
+      const pid = parseInt(name, 10);
+      if (!Number.isFinite(pid) || !isPidAlive(pid)) {
+        try { fs.unlinkSync(path.join(ACTIVE_DIR, name)); } catch {}
+      }
+    }
+  } catch {}
+}
+
+function hasOtherActiveInstances(): boolean {
+  try {
+    for (const name of fs.readdirSync(ACTIVE_DIR)) {
+      const pid = parseInt(name, 10);
+      if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) return true;
+    }
+  } catch {}
+  return false;
+}
+
 function playRemoteSound() {
   // In remote sessions, webview audio is blocked by Electron's autoplay policy.
   // Use the terminal bell instead — VS Code forwards BEL to the local client.
@@ -85,10 +115,15 @@ export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
   syncConfig();
 
-  // Signal to hook scripts that the extension is running and will handle
-  // "done" sound/notification with debounce. Without this flag, hooks play
-  // sounds directly as a fallback for terminal-only users.
-  try { fs.writeFileSync(ACTIVE_FLAG, String(process.pid)); } catch {}
+  // Register this window as an active instance so hook scripts defer
+  // "done" sound/notification to the extension (which debounces). Each
+  // window writes its own PID file; hooks verify liveness before deferring,
+  // so stale markers from crashed windows never block terminal fallback.
+  try {
+    fs.mkdirSync(ACTIVE_DIR, { recursive: true });
+    cleanStalePidFiles();
+    fs.writeFileSync(OWN_PID_FILE, "");
+  } catch {}
 
   soundEnabled = !fs.existsSync(MUTE_FLAG);
 
@@ -328,9 +363,10 @@ function setupHooks(context: vscode.ExtensionContext) {
 }
 
 function teardownHooks() {
-  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE, ACTIVE_FLAG]) {
+  for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE]) {
     try { fs.unlinkSync(file); } catch {}
   }
+  try { fs.rmdirSync(ACTIVE_DIR); } catch {}
   // Clean up legacy and cross-platform hook files
   for (const name of ["claude-notifier-on-stop", "claude-notifier-on-permission", "claude-notifier-on-question", "claude-notifier-on-notification"]) {
     for (const ext of [".js", ".ps1", ".sh"]) {
@@ -373,6 +409,11 @@ export function deactivate() {
     watcher.close();
     watcher = null;
   }
-  try { fs.unlinkSync(ACTIVE_FLAG); } catch {}
-  teardownHooks();
+  // Remove our PID marker first, then only tear down shared state if no
+  // other VSCode windows are still running the extension — otherwise we'd
+  // pull hook scripts and config out from under them.
+  try { fs.unlinkSync(OWN_PID_FILE); } catch {}
+  if (!hasOtherActiveInstances()) {
+    teardownHooks();
+  }
 }

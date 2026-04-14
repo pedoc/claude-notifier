@@ -2,8 +2,9 @@
 // Claude Notifier — Stop hook script (v3)
 // Writes a "done" signal for the VSCode extension to debounce. When no
 // extension is active (terminal-only), plays sound/notification directly as
-// a fallback. The extension writes a claude-notifier-active marker file so
-// the hook knows to defer to it.
+// a fallback. Each active extension window writes a PID marker file into
+// claude-notifier-active.d/; the hook only defers when a marker names a
+// live process, so a crashed extension doesn't silence terminal fallback.
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -11,7 +12,18 @@ const { execSync } = require("child_process");
 const HOOKS_DIR = path.join(process.env.HOME || process.env.USERPROFILE || "~", ".claude", "hooks");
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
-const ACTIVE_FLAG = path.join(HOOKS_DIR, "claude-notifier-active");
+const ACTIVE_DIR = path.join(HOOKS_DIR, "claude-notifier-active.d");
+
+function extensionIsActive() {
+  let entries;
+  try { entries = fs.readdirSync(ACTIVE_DIR); } catch { return false; }
+  for (const name of entries) {
+    const pid = parseInt(name, 10);
+    if (!Number.isFinite(pid)) continue;
+    try { process.kill(pid, 0); return true; } catch {}
+  }
+  return false;
+}
 const IS_WIN = process.platform === "win32";
 const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
   try { return fs.readFileSync("/proc/version", "utf-8").toLowerCase().includes("microsoft"); } catch { return false; }
@@ -62,7 +74,7 @@ process.stdin.on("end", () => {
 
   // If the extension is active it handles sound/notification with debounce.
   // Only play directly when running in terminal without the extension.
-  if (fs.existsSync(ACTIVE_FLAG)) process.exit(0);
+  if (extensionIsActive()) process.exit(0);
 
   const config = readConfig();
   const eventCfg = config?.taskCompleted ?? {};
