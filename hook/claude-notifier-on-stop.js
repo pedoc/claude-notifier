@@ -1,12 +1,17 @@
 #!/usr/bin/env node
-// Claude Notifier — Stop hook script (v2)
-// Plays "task completed" or "question asked" sound when Claude finishes.
+// Claude Notifier — Stop hook script (v3)
+// Writes a "done" signal for the VSCode extension to debounce. When no
+// extension is active (terminal-only), plays sound/notification directly as
+// a fallback. The extension writes a claude-notifier-active marker file so
+// the hook knows to defer to it.
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
 const HOOKS_DIR = path.join(process.env.HOME || process.env.USERPROFILE || "~", ".claude", "hooks");
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
+const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
+const ACTIVE_FLAG = path.join(HOOKS_DIR, "claude-notifier-active");
 const IS_WIN = process.platform === "win32";
 const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
   try { return fs.readFileSync("/proc/version", "utf-8").toLowerCase().includes("microsoft"); } catch { return false; }
@@ -40,16 +45,6 @@ function readConfig() {
   catch { return null; }
 }
 
-const DEFAULT_SOUNDS = {
-  question: { mac: "/System/Library/Sounds/Pop.aiff", win: "C:\\Windows\\Media\\Windows Notify.wav" },
-  done: { mac: "/System/Library/Sounds/Hero.aiff", win: "C:\\Windows\\Media\\tada.wav" },
-};
-
-const MESSAGES = {
-  question: "Claude is asking you a question.",
-  done: "Claude has finished the task.",
-};
-
 let raw = "";
 process.stdin.setEncoding("utf-8");
 process.stdin.on("data", (chunk) => (raw += chunk));
@@ -60,40 +55,23 @@ process.stdin.on("end", () => {
   if (input.stop_hook_active) process.exit(0);
   if (fs.existsSync(MUTE_FLAG)) process.exit(0);
 
-  let reason = "done";
-  const transcript = input.transcript_path || "";
+  // Write signal for the VSCode extension (which debounces "done" signals).
+  try {
+    fs.writeFileSync(SIGNAL_FILE, "done " + Date.now());
+  } catch {}
 
-  if (transcript && fs.existsSync(transcript)) {
-    try {
-      const data = fs.readFileSync(transcript, "utf-8").trim();
-      const lines = data.split("\n").slice(-20);
-      for (let i = lines.length - 1; i >= 0; i--) {
-        try {
-          const msg = JSON.parse(lines[i]);
-          if (msg.role === "assistant" && Array.isArray(msg.content) && msg.content.length > 0) {
-            const last = msg.content[msg.content.length - 1];
-            if (last.type === "tool_use" && last.name === "AskUserQuestion") {
-              reason = "question";
-            } else if (last.type === "text" && last.text && last.text.trim().endsWith("?")) {
-              reason = "question";
-            }
-            break;
-          }
-        } catch {}
-      }
-    } catch {}
-  }
+  // If the extension is active it handles sound/notification with debounce.
+  // Only play directly when running in terminal without the extension.
+  if (fs.existsSync(ACTIVE_FLAG)) process.exit(0);
 
   const config = readConfig();
-  const configKey = reason === "question" ? "asksQuestion" : "taskCompleted";
-  const eventCfg = config?.[configKey] ?? {};
+  const eventCfg = config?.taskCompleted ?? {};
   const level = eventCfg.level ?? "sound+popup";
 
   if (level === "off") process.exit(0);
 
-  const sound = resolveSound(eventCfg.sound, DEFAULT_SOUNDS[reason].mac, DEFAULT_SOUNDS[reason].win);
+  const sound = resolveSound(eventCfg.sound, "/System/Library/Sounds/Hero.aiff", "C:\\Windows\\Media\\tada.wav");
 
-  // Play sound
   if (level === "sound+popup" || level === "sound") {
     try {
       if (USE_WIN) {
@@ -105,24 +83,16 @@ process.stdin.on("end", () => {
     } catch {}
   }
 
-  // OS notification
-  const message = MESSAGES[reason];
   if (level === "sound+popup" || level === "popup") {
     try {
       if (USE_WIN) {
-        const safeMsg = message.replace(/'/g, "''");
-        const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','${safeMsg}',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
+        const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','Claude has finished the task.',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
         execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
       } else {
-        execSync(`osascript -e 'display notification "${message}" with title "Claude Notifier"'`, { stdio: "ignore" });
+        execSync(`osascript -e 'display notification "Claude has finished the task." with title "Claude Notifier"'`, { stdio: "ignore" });
       }
     } catch {}
   }
-
-  // Write signal for VSCode extension
-  try {
-    fs.writeFileSync(path.join(HOOKS_DIR, "claude-signal"), reason + " " + Date.now());
-  } catch {}
 
   process.exit(0);
 });
