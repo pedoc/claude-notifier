@@ -78,6 +78,13 @@
           "enum": ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink", "Windows Notify", "tada", "chimes", "chord", "ding", "notify", "ringin", "Windows Background"],
           "default": "Funk",
           "description": "Sound preset when Claude asks a question. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        },
+        "claudeNotifier.doneDebounceMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "Milliseconds to wait after a 'done' signal before notifying. Collapses rapid subtask Stop events into a single notification. Lower = snappier; higher = safer against duplicates."
         }
       }
     }

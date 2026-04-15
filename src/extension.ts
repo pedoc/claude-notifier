@@ -227,12 +227,15 @@ function handleSignal() {
 
   if (reason === "done") {
     // Debounce "done" signals — Claude fires Stop hooks between subtasks.
-    // Only notify after 3 seconds of silence (no new signals).
+    // Only notify after N ms of silence (no new signals).
+    const debounceMs = vscode.workspace
+      .getConfiguration("claudeNotifier")
+      .get<number>("doneDebounceMs", 2000);
     if (doneDebounceTimer) clearTimeout(doneDebounceTimer);
     doneDebounceTimer = setTimeout(() => {
       doneDebounceTimer = null;
       showNotification("done");
-    }, 3000);
+    }, debounceMs);
   } else {
     // "question" and "input" signals are immediate — user action is needed.
     // Cancel any pending "done" notification (the stop after a question is expected).
