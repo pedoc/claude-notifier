@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.0] - 2026-04-15
+
+Contributions in this release by [@agrigoriev](https://github.com/agrigoriev).
+
+### Added
+
+- Configurable debounce interval for task-completion notifications, suppressing rapid-fire alerts during back-to-back completions.
+- Improved notification handling and sound playback logic for more reliable cross-platform behavior.
+
+### Fixed
+
+- The question hook now guards against a missing `matcher` field. A misconfigured `PreToolUse` entry without `matcher: "AskUserQuestion"` previously fired the question notification on every tool call; the extension's setup check now rewrites such stale entries. ([#9](https://github.com/ashmitb95/claude-notifier/issues/9), [#10](https://github.com/ashmitb95/claude-notifier/pull/10))
+- Replaced the single `claude-notifier-active` flag file with a `claude-notifier-active.d/` directory containing one PID-named marker per live extension instance. This resolves two coordination bugs in the extension↔hook active-flag protocol: a stale flag lingering after an extension-host crash caused stop hooks to defer indefinitely; and with multiple VS Code windows open, the first to deactivate would tear down hooks while other windows remained active. Hooks now verify that at least one marker corresponds to a live process before deferring. ([#8](https://github.com/ashmitb95/claude-notifier/issues/8), [#9](https://github.com/ashmitb95/claude-notifier/issues/9))
+
 ## [2.1.1] - 2026-04-03
 
 ### Fixed
