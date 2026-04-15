@@ -131,6 +131,20 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 | Windows  | Yes              | VSCode only | PowerShell                                                |
 | WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
 
+## Contributing
+
+Bug reports and feature requests are welcome — please [open an issue](https://github.com/ashmitb95/claude-notifier/issues/new) first so we can discuss the change before code is written. For pull requests:
+
+- Branch from `main` and keep changes focused — one fix or feature per PR.
+- Follow the existing commit style (`fix:`, `feat:`, `chore:` …).
+- Test your changes locally on the platform(s) you've touched (macOS, Windows, or WSL) and note what you verified in the PR description.
+
+### Contributors
+
+Thanks to everyone who has contributed to this project:
+
+[![Contributors](https://contrib.rocks/image?repo=ashmitb95/claude-notifier)](https://github.com/ashmitb95/claude-notifier/graphs/contributors)
+
 ## License
 
 [GPL-3.0](LICENSE.md)
