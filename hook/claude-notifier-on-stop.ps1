@@ -1,10 +1,27 @@
-# Claude Notifier - Stop hook (PowerShell, v2)
-# Plays "task completed" or "question asked" sound when Claude finishes.
+# Claude Notifier - Stop hook (PowerShell, v3)
+# Writes a "done" signal for the VSCode extension to debounce. When no
+# extension is active (terminal-only), plays sound/notification directly.
 $ErrorActionPreference = 'SilentlyContinue'
 
 $hooksDir = $PSScriptRoot
 $muteFlag = Join-Path $hooksDir 'claude-notifier-muted'
+$signalFile = Join-Path $hooksDir 'claude-signal'
+$activeDir  = Join-Path $hooksDir 'claude-notifier-active.d'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
+
+# Extension writes one PID marker file per window into $activeDir. Only
+# treat the extension as active when a marker names a live process, so a
+# stale marker from a crashed window doesn't silence terminal fallback.
+function Test-ExtensionActive {
+    if (-not (Test-Path $activeDir)) { return $false }
+    foreach ($f in Get-ChildItem -Path $activeDir -File -ErrorAction SilentlyContinue) {
+        $pidVal = 0
+        if ([int]::TryParse($f.Name, [ref]$pidVal)) {
+            if (Get-Process -Id $pidVal -ErrorAction SilentlyContinue) { return $true }
+        }
+    }
+    return $false
+}
 
 $winSounds = @{
     'Windows Notify' = 'C:\Windows\Media\Windows Notify.wav'
@@ -23,46 +40,26 @@ try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 if ($data.stop_hook_active) { exit 0 }
 if (Test-Path $muteFlag) { exit 0 }
 
-$reason = 'done'
+# Write signal for the VSCode extension (which debounces "done" signals).
+try {
+    Set-Content -Path $signalFile -Value "done $(Get-Date -UFormat %s)" -NoNewline
+} catch {}
 
-$transcript = $data.transcript_path
-if ($transcript -and (Test-Path $transcript)) {
-    try {
-        $lines = Get-Content $transcript -Tail 20
-        for ($i = $lines.Count - 1; $i -ge 0; $i--) {
-            try {
-                $msg = $lines[$i] | ConvertFrom-Json
-                if ($msg.role -eq 'assistant' -and $msg.content -and $msg.content.Count -gt 0) {
-                    $last = $msg.content[$msg.content.Count - 1]
-                    if ($last.type -eq 'tool_use' -and $last.name -eq 'AskUserQuestion') {
-                        $reason = 'question'
-                    } elseif ($last.type -eq 'text' -and $last.text -and $last.text.Trim().EndsWith('?')) {
-                        $reason = 'question'
-                    }
-                    break
-                }
-            } catch {}
-        }
-    } catch {}
-}
+# If the extension is active it handles sound/notification with debounce.
+# Only play directly when running in terminal without the extension.
+if (Test-ExtensionActive) { exit 0 }
 
-# Read config
 $config = $null
 try { $config = (Get-Content $configFile -Raw) | ConvertFrom-Json } catch {}
 
-$configKey = if ($reason -eq 'question') { 'asksQuestion' } else { 'taskCompleted' }
-$eventCfg = if ($config -and $config.$configKey) { $config.$configKey } else { $null }
+$eventCfg = if ($config -and $config.taskCompleted) { $config.taskCompleted } else { $null }
 $level = if ($eventCfg -and $eventCfg.level) { $eventCfg.level } else { 'sound+popup' }
 
 if ($level -eq 'off') { exit 0 }
 
-$defaultSounds = @{ question = 'C:\Windows\Media\Windows Notify.wav'; done = 'C:\Windows\Media\tada.wav' }
 $soundName = if ($eventCfg -and $eventCfg.sound) { $eventCfg.sound } else { '' }
-$soundPath = if ($winSounds.ContainsKey($soundName)) { $winSounds[$soundName] } else { $defaultSounds[$reason] }
+$soundPath = if ($winSounds.ContainsKey($soundName)) { $winSounds[$soundName] } else { 'C:\Windows\Media\tada.wav' }
 
-$messages = @{ question = 'Claude is asking you a question.'; done = 'Claude has finished the task.' }
-
-# Play sound
 if ($level -eq 'sound+popup' -or $level -eq 'sound') {
     try {
         if (Test-Path $soundPath) { (New-Object Media.SoundPlayer $soundPath).PlaySync() }
@@ -70,20 +67,14 @@ if ($level -eq 'sound+popup' -or $level -eq 'sound') {
     } catch {}
 }
 
-# OS notification
 if ($level -eq 'sound+popup' -or $level -eq 'popup') {
     try {
         Add-Type -AssemblyName System.Windows.Forms
         $n = New-Object System.Windows.Forms.NotifyIcon
         $n.Icon = [System.Drawing.SystemIcons]::Information
         $n.Visible = $true
-        $n.ShowBalloonTip(3000, 'Claude Notifier', $messages[$reason], [System.Windows.Forms.ToolTipIcon]::None)
+        $n.ShowBalloonTip(3000, 'Claude Notifier', 'Claude has finished the task.', [System.Windows.Forms.ToolTipIcon]::None)
         Start-Sleep -Milliseconds 500
         $n.Dispose()
     } catch {}
 }
-
-# Write signal for VSCode extension
-try {
-    Set-Content -Path (Join-Path $hooksDir 'claude-signal') -Value "$reason $(Get-Date -UFormat %s)" -NoNewline
-} catch {}

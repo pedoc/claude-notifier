@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { exec } from "child_process";
 
 const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
@@ -12,8 +13,51 @@ const PERMISSION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-permission${HOO
 const QUESTION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-question${HOOK_EXT}`);
 const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
+// Directory of per-PID marker files. Hooks treat the extension as active if
+// any marker inside corresponds to a live PID. Using a directory (instead of a
+// single flag file) lets multiple VSCode windows coexist and survives crashes:
+// stale markers get cleaned up on next activate and ignored via PID liveness.
+const ACTIVE_DIR = path.join(HOOKS_DIR, "claude-notifier-active.d");
+const OWN_PID_FILE = path.join(ACTIVE_DIR, String(process.pid));
 const CONFIG_FILE = path.join(HOOKS_DIR, "claude-notifier-config.json");
 const SETTINGS_FILE = path.join(CLAUDE_DIR, "settings.json");
+
+const MACOS_SOUNDS: Record<string, string> = {
+  Basso: "/System/Library/Sounds/Basso.aiff", Blow: "/System/Library/Sounds/Blow.aiff",
+  Bottle: "/System/Library/Sounds/Bottle.aiff", Frog: "/System/Library/Sounds/Frog.aiff",
+  Funk: "/System/Library/Sounds/Funk.aiff", Glass: "/System/Library/Sounds/Glass.aiff",
+  Hero: "/System/Library/Sounds/Hero.aiff", Morse: "/System/Library/Sounds/Morse.aiff",
+  Ping: "/System/Library/Sounds/Ping.aiff", Pop: "/System/Library/Sounds/Pop.aiff",
+  Purr: "/System/Library/Sounds/Purr.aiff", Sosumi: "/System/Library/Sounds/Sosumi.aiff",
+  Submarine: "/System/Library/Sounds/Submarine.aiff", Tink: "/System/Library/Sounds/Tink.aiff",
+};
+const WIN_SOUNDS: Record<string, string> = {
+  "Windows Notify": "C:\\Windows\\Media\\Windows Notify.wav", "tada": "C:\\Windows\\Media\\tada.wav",
+  "chimes": "C:\\Windows\\Media\\chimes.wav", "chord": "C:\\Windows\\Media\\chord.wav",
+  "ding": "C:\\Windows\\Media\\ding.wav", "notify": "C:\\Windows\\Media\\notify.wav",
+  "ringin": "C:\\Windows\\Media\\ringin.wav", "Windows Background": "C:\\Windows\\Media\\Windows Background.wav",
+};
+
+function playLocalSound(soundName: string, defaultMac: string, defaultWin: string) {
+  if (IS_WIN) {
+    const soundPath = WIN_SOUNDS[soundName] || defaultWin;
+    const ps = `$s='${soundPath}'; if(Test-Path $s){(New-Object Media.SoundPlayer $s).PlaySync()}else{[console]::Beep(800,300)}`;
+    exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { timeout: 5000 });
+  } else {
+    const soundPath = MACOS_SOUNDS[soundName] || defaultMac;
+    exec(`afplay "${soundPath}"`);
+  }
+}
+
+function showLocalNotification(message: string) {
+  if (IS_WIN) {
+    const safeMsg = message.replace(/'/g, "''");
+    const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','${safeMsg}',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
+    exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { timeout: 5000 });
+  } else {
+    exec(`osascript -e 'display notification "${message}" with title "Claude Notifier"'`);
+  }
+}
 
 function hookCmd(hookPath: string): string {
   if (IS_WIN) {
@@ -27,6 +71,32 @@ const ALL_HOOK_TYPES = ["Stop", "PermissionRequest", "PreToolUse", "Notification
 let statusBarItem: vscode.StatusBarItem;
 let watcher: fs.FSWatcher | null = null;
 let soundEnabled = true;
+let doneDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function isPidAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function cleanStalePidFiles() {
+  try {
+    for (const name of fs.readdirSync(ACTIVE_DIR)) {
+      const pid = parseInt(name, 10);
+      if (!Number.isFinite(pid) || !isPidAlive(pid)) {
+        try { fs.unlinkSync(path.join(ACTIVE_DIR, name)); } catch {}
+      }
+    }
+  } catch {}
+}
+
+function hasOtherActiveInstances(): boolean {
+  try {
+    for (const name of fs.readdirSync(ACTIVE_DIR)) {
+      const pid = parseInt(name, 10);
+      if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) return true;
+    }
+  } catch {}
+  return false;
+}
 
 function playRemoteSound() {
   // In remote sessions, webview audio is blocked by Electron's autoplay policy.
@@ -44,6 +114,16 @@ function playRemoteSound() {
 export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
   syncConfig();
+
+  // Register this window as an active instance so hook scripts defer
+  // "done" sound/notification to the extension (which debounces). Each
+  // window writes its own PID file; hooks verify liveness before deferring,
+  // so stale markers from crashed windows never block terminal fallback.
+  try {
+    fs.mkdirSync(ACTIVE_DIR, { recursive: true });
+    cleanStalePidFiles();
+    fs.writeFileSync(OWN_PID_FILE, "");
+  } catch {}
 
   soundEnabled = !fs.existsSync(MUTE_FLAG);
 
@@ -119,13 +199,20 @@ function syncConfig() {
   } catch {}
 }
 
-function getEventLevel(eventKey: string): string {
+function getEventConfig(eventKey: string): { level: string; sound: string } {
   try {
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-    return config[eventKey]?.level ?? "sound+popup";
+    return {
+      level: config[eventKey]?.level ?? "sound+popup",
+      sound: config[eventKey]?.sound ?? "",
+    };
   } catch {
-    return "sound+popup";
+    return { level: "sound+popup", sound: "" };
   }
+}
+
+function getEventLevel(eventKey: string): string {
+  return getEventConfig(eventKey).level;
 }
 
 function handleSignal() {
@@ -137,9 +224,35 @@ function handleSignal() {
   }
 
   const reason = content.split(" ")[0];
-  // When running on a remote host the extension process is on the server and
-  // cannot play audio. VS Code webviews always render in the local renderer, so
-  // we synthesize a tone there instead.
+
+  if (reason === "done") {
+    // Debounce "done" signals — Claude fires Stop hooks between subtasks.
+    // Only notify after N ms of silence (no new signals).
+    const debounceMs = vscode.workspace
+      .getConfiguration("claudeNotifier")
+      .get<number>("doneDebounceMs", 2000);
+    if (doneDebounceTimer) clearTimeout(doneDebounceTimer);
+    doneDebounceTimer = setTimeout(() => {
+      doneDebounceTimer = null;
+      showNotification("done");
+    }, debounceMs);
+  } else {
+    // "question" and "input" signals are immediate — user action is needed.
+    // Cancel any pending "done" notification (the stop after a question is expected).
+    if (doneDebounceTimer) {
+      clearTimeout(doneDebounceTimer);
+      doneDebounceTimer = null;
+    }
+    if (reason === "input" || reason === "question") {
+      showNotification(reason);
+    }
+  }
+}
+
+function showNotification(reason: string) {
+  // Architecture note: "question" and "input" local sounds are played by their
+  // respective hook scripts (PreToolUse / PermissionRequest) — not the extension.
+  // Only "done" local sounds are played here, because the extension debounces them.
   const isRemote = !!vscode.env.remoteName;
 
   if (reason === "input") {
@@ -160,11 +273,19 @@ function handleSignal() {
     }
   } else if (reason === "done") {
     const level = getEventLevel("taskCompleted");
-    if (isRemote && (level === "sound+popup" || level === "sound")) {
-      playRemoteSound();
+    if (level === "sound+popup" || level === "sound") {
+      if (isRemote) {
+        playRemoteSound();
+      } else {
+        const cfg = getEventConfig("taskCompleted");
+        playLocalSound(cfg.sound, "/System/Library/Sounds/Hero.aiff", "C:\\Windows\\Media\\tada.wav");
+      }
     }
     if (level === "sound+popup" || level === "popup") {
       vscode.window.showInformationMessage("Claude has finished the task.");
+      if (!isRemote) {
+        showLocalNotification("Claude has finished the task.");
+      }
     }
   }
 }
@@ -192,15 +313,16 @@ function setupHooks(context: vscode.ExtensionContext) {
   // Check if our hooks are already configured with the right runner — skip if so
   const settings = readSettings();
   const expectedPrefix = IS_WIN ? "powershell" : "node";
-  const hasHook = (type: string, needle: string) =>
+  const hasHook = (type: string, needle: string, matcher?: string) =>
     settings.hooks?.[type]?.some((entry: any) =>
+      (matcher === undefined || entry.matcher === matcher) &&
       entry.hooks?.some((h: any) => h.command?.includes(needle) && h.command?.startsWith(expectedPrefix))
     );
 
   if (
     hasHook("Stop", "claude-notifier-on-stop") &&
     hasHook("PermissionRequest", "claude-notifier-on-permission") &&
-    hasHook("PreToolUse", "claude-notifier-on-question")
+    hasHook("PreToolUse", "claude-notifier-on-question", "AskUserQuestion")
   ) {
     return; // Already configured with correct runner, don't touch settings.json
   }
@@ -247,6 +369,7 @@ function teardownHooks() {
   for (const file of [STOP_HOOK, PERMISSION_HOOK, QUESTION_HOOK, SIGNAL_FILE, MUTE_FLAG, CONFIG_FILE]) {
     try { fs.unlinkSync(file); } catch {}
   }
+  try { fs.rmdirSync(ACTIVE_DIR); } catch {}
   // Clean up legacy and cross-platform hook files
   for (const name of ["claude-notifier-on-stop", "claude-notifier-on-permission", "claude-notifier-on-question", "claude-notifier-on-notification"]) {
     for (const ext of [".js", ".ps1", ".sh"]) {
@@ -289,5 +412,11 @@ export function deactivate() {
     watcher.close();
     watcher = null;
   }
-  teardownHooks();
+  // Remove our PID marker first, then only tear down shared state if no
+  // other VSCode windows are still running the extension — otherwise we'd
+  // pull hook scripts and config out from under them.
+  try { fs.unlinkSync(OWN_PID_FILE); } catch {}
+  if (!hasOtherActiveInstances()) {
+    teardownHooks();
+  }
 }
