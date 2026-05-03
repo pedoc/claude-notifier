@@ -1,6 +1,9 @@
 src/**
 .gitignore
+.vscodeignore
+.claude/**
 tsconfig.json
 node_modules/**
 install.sh
 uninstall.sh
+*.vsix

@@ -14,13 +14,45 @@ const MUTE_FLAG = path.join(HOOKS_DIR, "claude-notifier-muted");
 const SIGNAL_FILE = path.join(HOOKS_DIR, "claude-signal");
 const ACTIVE_DIR = path.join(HOOKS_DIR, "claude-notifier-active.d");
 
-function extensionIsActive() {
+function findTerminalNotifier() {
+  if (process.platform !== "darwin") return null;
+  for (const c of ["/opt/homebrew/bin/terminal-notifier", "/usr/local/bin/terminal-notifier"]) {
+    try { fs.accessSync(c, fs.constants.X_OK); return c; } catch {}
+  }
+  try {
+    const out = require("child_process").execFileSync("/usr/bin/which", ["terminal-notifier"], { encoding: "utf-8" }).trim();
+    if (out) return out;
+  } catch {}
+  return null;
+}
+
+function cwdInsideFolder(cwd, folder) {
+  if (!cwd || !folder) return false;
+  if (cwd === folder) return true;
+  const sep = path.sep;
+  return cwd.startsWith(folder.endsWith(sep) ? folder : folder + sep);
+}
+
+// Returns true if any live extension owns this cwd (i.e. its window has a
+// matching workspace folder). When no extension claims the cwd — for example
+// a Claude session running in a terminal that's not inside any open VS Code
+// workspace — we fall through to terminal-fallback notifications.
+function extensionOwnsCwd(cwd) {
   let entries;
   try { entries = fs.readdirSync(ACTIVE_DIR); } catch { return false; }
   for (const name of entries) {
     const pid = parseInt(name, 10);
     if (!Number.isFinite(pid)) continue;
-    try { process.kill(pid, 0); return true; } catch {}
+    try { process.kill(pid, 0); } catch { continue; }
+    let folders = "";
+    try { folders = fs.readFileSync(path.join(ACTIVE_DIR, name), "utf-8"); } catch {}
+    // Backwards-compat: empty PID file means a pre-cwd-routing extension is
+    // running. Defer to it for any signal — once that window reloads, the
+    // file gets a workspace list and proper routing kicks in.
+    if (!folders.trim()) return true;
+    for (const folder of folders.split("\n").map((s) => s.trim()).filter(Boolean)) {
+      if (cwdInsideFolder(cwd, folder)) return true;
+    }
   }
   return false;
 }
@@ -67,14 +99,18 @@ process.stdin.on("end", () => {
   if (input.stop_hook_active) process.exit(0);
   if (fs.existsSync(MUTE_FLAG)) process.exit(0);
 
-  // Write signal for the VSCode extension (which debounces "done" signals).
+  const cwd = (input && input.cwd) || process.cwd() || "";
+
+  // Write signal for the VSCode extension (which debounces "done" signals
+  // and routes them to the matching window via cwd).
   try {
-    fs.writeFileSync(SIGNAL_FILE, "done " + Date.now());
+    fs.writeFileSync(SIGNAL_FILE, `done ${Date.now()} ${cwd}`);
   } catch {}
 
-  // If the extension is active it handles sound/notification with debounce.
-  // Only play directly when running in terminal without the extension.
-  if (extensionIsActive()) process.exit(0);
+  // If a VSCode window owns this cwd, the extension handles sound/notification
+  // with debounce. Otherwise (terminal Claude or unrelated workspace) we play
+  // directly here.
+  if (extensionOwnsCwd(cwd)) process.exit(0);
 
   const config = readConfig();
   const eventCfg = config?.taskCompleted ?? {};
@@ -101,7 +137,15 @@ process.stdin.on("end", () => {
         const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','Claude has finished the task.',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
         execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
       } else {
-        execSync(`osascript -e 'display notification "Claude has finished the task." with title "Claude Notifier"'`, { stdio: "ignore" });
+        const tn = findTerminalNotifier();
+        if (tn) {
+          require("child_process").execFileSync(tn, [
+            "-title", "Claude Notifier",
+            "-message", "Claude has finished the task.",
+          ], { stdio: "ignore" });
+        } else {
+          execSync(`osascript -e 'display notification "Claude has finished the task." with title "Claude Notifier"'`, { stdio: "ignore" });
+        }
       }
     } catch {}
   }

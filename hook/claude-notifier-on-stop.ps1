@@ -9,15 +9,33 @@ $signalFile = Join-Path $hooksDir 'claude-signal'
 $activeDir  = Join-Path $hooksDir 'claude-notifier-active.d'
 $configFile = Join-Path $hooksDir 'claude-notifier-config.json'
 
-# Extension writes one PID marker file per window into $activeDir. Only
-# treat the extension as active when a marker names a live process, so a
-# stale marker from a crashed window doesn't silence terminal fallback.
-function Test-ExtensionActive {
+# Extension writes one PID marker file per window into $activeDir. The file's
+# content is the window's workspace folder list (one per line). Only treat
+# the extension as the owner of a Stop signal when a live PID's workspace
+# contains the firing cwd — otherwise fall through to terminal fallback so
+# Claude sessions outside any open workspace still get notified.
+function Test-CwdInsideFolder([string]$cwd, [string]$folder) {
+    if (-not $cwd -or -not $folder) { return $false }
+    if ($cwd -eq $folder) { return $true }
+    $sep = [IO.Path]::DirectorySeparatorChar
+    if (-not $folder.EndsWith($sep)) { $folder = $folder + $sep }
+    return $cwd.StartsWith($folder)
+}
+
+function Test-ExtensionOwnsCwd([string]$cwd) {
     if (-not (Test-Path $activeDir)) { return $false }
     foreach ($f in Get-ChildItem -Path $activeDir -File -ErrorAction SilentlyContinue) {
         $pidVal = 0
-        if ([int]::TryParse($f.Name, [ref]$pidVal)) {
-            if (Get-Process -Id $pidVal -ErrorAction SilentlyContinue) { return $true }
+        if (-not [int]::TryParse($f.Name, [ref]$pidVal)) { continue }
+        if (-not (Get-Process -Id $pidVal -ErrorAction SilentlyContinue)) { continue }
+        $folders = ""
+        try { $folders = [IO.File]::ReadAllText($f.FullName) } catch {}
+        # Backwards-compat: empty marker means a pre-cwd-routing extension is
+        # running. Defer to it; once it reloads the marker will be populated.
+        if (-not $folders.Trim()) { return $true }
+        foreach ($line in $folders -split "`n") {
+            $folder = $line.Trim()
+            if ($folder -and (Test-CwdInsideFolder $cwd $folder)) { return $true }
         }
     }
     return $false
@@ -40,14 +58,19 @@ try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 if ($data.stop_hook_active) { exit 0 }
 if (Test-Path $muteFlag) { exit 0 }
 
-# Write signal for the VSCode extension (which debounces "done" signals).
+$cwd = ""
+if ($data.cwd) { $cwd = "$($data.cwd)" }
+if (-not $cwd) { $cwd = (Get-Location).Path }
+
+# Write signal for the VSCode extension (which debounces "done" signals
+# and routes them to the matching window via cwd).
 try {
-    Set-Content -Path $signalFile -Value "done $(Get-Date -UFormat %s)" -NoNewline
+    Set-Content -Path $signalFile -Value "done $(Get-Date -UFormat %s) $cwd" -NoNewline
 } catch {}
 
-# If the extension is active it handles sound/notification with debounce.
-# Only play directly when running in terminal without the extension.
-if (Test-ExtensionActive) { exit 0 }
+# If a VSCode window owns this cwd, the extension handles it. Otherwise
+# (terminal Claude or unrelated workspace) play directly here.
+if (Test-ExtensionOwnsCwd $cwd) { exit 0 }
 
 $config = $null
 try { $config = (Get-Content $configFile -Raw) | ConvertFrom-Json } catch {}

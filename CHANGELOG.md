@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0] - 2026-05-03
+
+### Added
+
+- Clickable macOS notifications via [`terminal-notifier`](https://github.com/julienXX/terminal-notifier). When installed, clicks (and the action button) focus the specific VS Code window the notification fired from instead of opening Script Editor. Falls back to the previous `osascript` notification when `terminal-notifier` is not present. ([#12](https://github.com/ashmitb95/claude-notifier/issues/12))
+- New command **"Claude Notifier: Install terminal-notifier (clickable macOS notifications)"** — detects Homebrew, opens an interactive terminal, and runs `brew install terminal-notifier` so the user sees the install output. Reload the window after install to pick up the new behavior.
+- Per-window routing: Stop hooks include the firing session's `cwd`, and each VS Code window only fires a notification when the `cwd` is inside one of its workspace folders. Two parallel Claude sessions in two different windows now produce two notifications, each in the correct window.
+
+### Fixed
+
+- The notifier now keeps working in terminal Claude / the Claude desktop app after VS Code is closed. Previously, closing the last VS Code window tore down the hook scripts entirely; now teardown only happens on actual extension uninstall (via `vscode:uninstall`). The hook's existing terminal-fallback path delivers sound and system notification when no VS Code window is active.
+
 ## [2.2.0] - 2026-04-15
 
 Contributions in this release by [@agrigoriev](https://github.com/agrigoriev).

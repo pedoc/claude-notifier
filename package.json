@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "icon": "media/icon.png",
   "publisher": "SingularityInc",
   "repository": {
@@ -20,6 +20,10 @@
       {
         "command": "claudeNotifier.toggleSound",
         "title": "Claude Notifier: Toggle Sound"
+      },
+      {
+        "command": "claudeNotifier.installTerminalNotifier",
+        "title": "Claude Notifier: Install terminal-notifier (clickable macOS notifications)"
       }
     ],
     "configuration": {

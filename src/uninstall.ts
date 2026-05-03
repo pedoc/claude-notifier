@@ -16,9 +16,11 @@ for (const name of [
     try { fs.unlinkSync(path.join(HOOKS_DIR, `${name}${ext}`)); } catch {}
   }
 }
-for (const file of ["claude-notifier-muted", "claude-signal", "claude-notifier-config.json"]) {
+for (const file of ["claude-notifier-muted", "claude-signal", "claude-notifier-config.json", "notifier-target", ".claude-notifier-stamp"]) {
   try { fs.unlinkSync(path.join(HOOKS_DIR, file)); } catch {}
 }
+// Older versions shipped a generated AppleScript shim — remove if present.
+try { fs.rmSync(path.join(HOOKS_DIR, "ClaudeNotifier.app"), { recursive: true, force: true }); } catch {}
 
 try {
   const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));

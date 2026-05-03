@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { exec } from "child_process";
+import { exec, execFileSync } from "child_process";
 
 const HOME = process.env.HOME || process.env.USERPROFILE || "~";
 const CLAUDE_DIR = path.join(HOME, ".claude");
 const HOOKS_DIR = path.join(CLAUDE_DIR, "hooks");
 const IS_WIN = process.platform === "win32";
+const IS_MAC = process.platform === "darwin";
 const HOOK_EXT = IS_WIN ? ".ps1" : ".js";
 const STOP_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-stop${HOOK_EXT}`);
 const PERMISSION_HOOK = path.join(HOOKS_DIR, `claude-notifier-on-permission${HOOK_EXT}`);
@@ -49,14 +50,58 @@ function playLocalSound(soundName: string, defaultMac: string, defaultWin: strin
   }
 }
 
+// terminal-notifier is the only way to get clickable macOS notifications that
+// focus VS Code instead of Script Editor. We use -execute (not -activate)
+// because -activate is broken on recent macOS, and we run the `code` CLI so
+// the specific workspace window comes forward — no osascript on the click
+// path means no Script Editor flash. See issue #12.
+let terminalNotifierPath: string | null = null;
+let codeCliPath: string | null = null;
+
+function findTerminalNotifier(): string | null {
+  if (!IS_MAC) return null;
+  for (const candidate of ["/opt/homebrew/bin/terminal-notifier", "/usr/local/bin/terminal-notifier"]) {
+    try { fs.accessSync(candidate, fs.constants.X_OK); return candidate; } catch {}
+  }
+  try {
+    const found = execFileSync("/usr/bin/which", ["terminal-notifier"], { encoding: "utf-8" }).trim();
+    if (found) return found;
+  } catch {}
+  return null;
+}
+
+function findCodeCli(): string | null {
+  try {
+    const candidate = path.join(vscode.env.appRoot, "bin", "code");
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return candidate;
+  } catch { return null; }
+}
+
 function showLocalNotification(message: string) {
   if (IS_WIN) {
     const safeMsg = message.replace(/'/g, "''");
     const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','${safeMsg}',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
     exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { timeout: 5000 });
+  } else if (IS_MAC && terminalNotifierPath) {
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const executeCmd = codeCliPath && folder
+      ? `${shellQuote(codeCliPath)} ${shellQuote(folder)}`
+      : `osascript -e 'tell application "Visual Studio Code" to activate'`;
+    const args = [
+      "-title", "Claude Notifier",
+      "-message", message,
+      "-execute", executeCmd,
+    ];
+    exec(`${shellQuote(terminalNotifierPath)} ${args.map(shellQuote).join(" ")}`);
   } else {
-    exec(`osascript -e 'display notification "${message}" with title "Claude Notifier"'`);
+    const safeMsg = message.replace(/[\\"]/g, "\\$&");
+    exec(`osascript -e 'display notification "${safeMsg}" with title "Claude Notifier"'`);
   }
+}
+
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 function hookCmd(hookPath: string): string {
@@ -77,6 +122,23 @@ function isPidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
+function getOwnWorkspaceFolders(): string[] {
+  return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+}
+
+function writeOwnPidFile() {
+  try {
+    const folders = getOwnWorkspaceFolders().join("\n");
+    fs.writeFileSync(OWN_PID_FILE, folders);
+  } catch {}
+}
+
+function cwdMatchesFolder(cwd: string, folder: string): boolean {
+  if (!cwd || !folder) return false;
+  if (cwd === folder) return true;
+  return cwd.startsWith(folder.endsWith(path.sep) ? folder : folder + path.sep);
+}
+
 function cleanStalePidFiles() {
   try {
     for (const name of fs.readdirSync(ACTIVE_DIR)) {
@@ -86,16 +148,6 @@ function cleanStalePidFiles() {
       }
     }
   } catch {}
-}
-
-function hasOtherActiveInstances(): boolean {
-  try {
-    for (const name of fs.readdirSync(ACTIVE_DIR)) {
-      const pid = parseInt(name, 10);
-      if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) return true;
-    }
-  } catch {}
-  return false;
 }
 
 function playRemoteSound() {
@@ -114,16 +166,24 @@ function playRemoteSound() {
 export function activate(context: vscode.ExtensionContext) {
   setupHooks(context);
   syncConfig();
+  terminalNotifierPath = findTerminalNotifier();
+  codeCliPath = findCodeCli();
 
   // Register this window as an active instance so hook scripts defer
-  // "done" sound/notification to the extension (which debounces). Each
-  // window writes its own PID file; hooks verify liveness before deferring,
-  // so stale markers from crashed windows never block terminal fallback.
+  // "done" sound/notification to the extension (which debounces). The PID
+  // file's content is the workspace folder — hooks use it to route Stop
+  // signals to the right window, and the extension uses its own folder list
+  // to filter incoming signals.
   try {
     fs.mkdirSync(ACTIVE_DIR, { recursive: true });
     cleanStalePidFiles();
-    fs.writeFileSync(OWN_PID_FILE, "");
+    writeOwnPidFile();
   } catch {}
+
+  // Workspace folder set can change at runtime — keep PID file fresh.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => writeOwnPidFile())
+  );
 
   soundEnabled = !fs.existsSync(MUTE_FLAG);
 
@@ -156,6 +216,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
   context.subscriptions.push(toggleCmd);
+
+  const installCmd = vscode.commands.registerCommand(
+    "claudeNotifier.installTerminalNotifier",
+    () => installTerminalNotifierFlow()
+  );
+  context.subscriptions.push(installCmd);
 
   const configListener = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("claudeNotifier")) {
@@ -223,7 +289,21 @@ function handleSignal() {
     return;
   }
 
-  const reason = content.split(" ")[0];
+  // Signal format: "<reason> <timestamp> <cwd...>" — cwd may contain spaces.
+  const firstSpace = content.indexOf(" ");
+  const secondSpace = firstSpace >= 0 ? content.indexOf(" ", firstSpace + 1) : -1;
+  const reason = firstSpace < 0 ? content : content.slice(0, firstSpace);
+  const cwd = secondSpace >= 0 ? content.slice(secondSpace + 1) : "";
+
+  // Each window only handles signals fired from inside its own workspace.
+  // Signals without a cwd (older hook scripts) fall through to all windows
+  // for backwards compatibility.
+  if (cwd) {
+    const folders = getOwnWorkspaceFolders();
+    if (folders.length > 0 && !folders.some((f) => cwdMatchesFolder(cwd, f))) {
+      return;
+    }
+  }
 
   if (reason === "done") {
     // Debounce "done" signals — Claude fires Stop hooks between subtasks.
@@ -288,6 +368,39 @@ function showNotification(reason: string) {
       }
     }
   }
+}
+
+// Bootstrap: install terminal-notifier via Homebrew so macOS notifications
+// can route clicks back to VS Code. The osascript fallback works without it
+// but its clicks open Script Editor (issue #12).
+function installTerminalNotifierFlow() {
+  if (!IS_MAC) {
+    vscode.window.showInformationMessage("terminal-notifier is macOS-only.");
+    return;
+  }
+  const existing = findTerminalNotifier();
+  if (existing) {
+    terminalNotifierPath = existing;
+    vscode.window.showInformationMessage(`terminal-notifier already installed at ${existing}.`);
+    return;
+  }
+  let brew: string | null = null;
+  for (const c of ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]) {
+    try { fs.accessSync(c, fs.constants.X_OK); brew = c; break; } catch {}
+  }
+  if (!brew) {
+    vscode.window.showWarningMessage(
+      "Homebrew not found. Install Homebrew first (https://brew.sh), then re-run this command.",
+      "Open brew.sh"
+    ).then((pick) => {
+      if (pick === "Open brew.sh") vscode.env.openExternal(vscode.Uri.parse("https://brew.sh"));
+    });
+    return;
+  }
+  // Run interactively in a terminal so the user sees output and any prompts.
+  const terminal = vscode.window.createTerminal({ name: "Claude Notifier — install terminal-notifier" });
+  terminal.show();
+  terminal.sendText(`${brew} install terminal-notifier && echo "" && echo "✓ Done. Run 'Developer: Reload Window' to enable clickable notifications."`);
 }
 
 // --- Hook lifecycle ---
@@ -370,6 +483,9 @@ function teardownHooks() {
     try { fs.unlinkSync(file); } catch {}
   }
   try { fs.rmdirSync(ACTIVE_DIR); } catch {}
+  // Clean up artifacts from older shim-based versions if present.
+  try { fs.rmSync(path.join(HOOKS_DIR, "ClaudeNotifier.app"), { recursive: true, force: true }); } catch {}
+  try { fs.unlinkSync(path.join(HOOKS_DIR, "notifier-target")); } catch {}
   // Clean up legacy and cross-platform hook files
   for (const name of ["claude-notifier-on-stop", "claude-notifier-on-permission", "claude-notifier-on-question", "claude-notifier-on-notification"]) {
     for (const ext of [".js", ".ps1", ".sh"]) {
@@ -412,11 +528,9 @@ export function deactivate() {
     watcher.close();
     watcher = null;
   }
-  // Remove our PID marker first, then only tear down shared state if no
-  // other VSCode windows are still running the extension — otherwise we'd
-  // pull hook scripts and config out from under them.
+  // Drop only this window's PID marker. Leave hook scripts and settings.json
+  // entries in place so Claude Code outside VS Code (terminal, desktop app)
+  // still gets sound + notification via the hook's terminal-fallback path.
+  // Full teardown happens on extension uninstall via uninstall.ts.
   try { fs.unlinkSync(OWN_PID_FILE); } catch {}
-  if (!hasOtherActiveInstances()) {
-    teardownHooks();
-  }
 }
