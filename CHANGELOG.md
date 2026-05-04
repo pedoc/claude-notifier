@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1] - 2026-05-03
+
+### Documentation
+
+- README: added a "Clickable macOS notifications (optional)" subsection covering `terminal-notifier` install (via `brew` or the bundled command) and the graceful fallback when it's not present.
+
 ## [2.3.0] - 2026-05-03
 
 ### Added

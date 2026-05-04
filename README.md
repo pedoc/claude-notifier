@@ -107,6 +107,18 @@ Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCod
 
 On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds.
 
+### Clickable macOS notifications (optional)
+
+By default, macOS attributes `osascript` notifications to the Script Editor bundle, so clicking one opens Script Editor instead of focusing VS Code. To get clickable notifications that focus the specific window the notification fired from, install [`terminal-notifier`](https://github.com/julienXX/terminal-notifier):
+
+```sh
+brew install terminal-notifier
+```
+
+Or use the bundled command — open the Command Palette and run **"Claude Notifier: Install terminal-notifier (clickable macOS notifications)"**. It runs the `brew install` in an interactive VS Code terminal so you can see what's happening. Reload the window after install to enable it.
+
+When `terminal-notifier` is present, the extension uses it automatically. When it's not, the extension falls back to the standard `osascript` notification (everything still works — clicks just open Script Editor).
+
 ## Mute/unmute (CLI)
 
 **macOS / Linux / WSL:**
