@@ -13,6 +13,7 @@ const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
 })();
 const USE_WIN = IS_WIN || IS_WSL;
 const PS_BIN = IS_WSL ? "powershell.exe" : "powershell";
+const IS_LINUX = !IS_WIN && !IS_WSL && process.platform === "linux";
 
 const MACOS_SOUNDS = {
   Basso: "/System/Library/Sounds/Basso.aiff", Blow: "/System/Library/Sounds/Blow.aiff",
@@ -29,9 +30,27 @@ const WIN_SOUNDS = {
   "ding": "C:\\Windows\\Media\\ding.wav", "notify": "C:\\Windows\\Media\\notify.wav",
   "ringin": "C:\\Windows\\Media\\ringin.wav", "Windows Background": "C:\\Windows\\Media\\Windows Background.wav",
 };
+const LINUX_SOUNDS_DIR = "/usr/share/sounds/freedesktop/stereo";
+const LINUX_SOUNDS = {
+  Basso:     `${LINUX_SOUNDS_DIR}/dialog-warning.oga`,
+  Blow:      `${LINUX_SOUNDS_DIR}/service-logout.oga`,
+  Bottle:    `${LINUX_SOUNDS_DIR}/bell.oga`,
+  Frog:      `${LINUX_SOUNDS_DIR}/message-new-instant.oga`,
+  Funk:      `${LINUX_SOUNDS_DIR}/message-new-instant.oga`,
+  Glass:     `${LINUX_SOUNDS_DIR}/bell.oga`,
+  Hero:      `${LINUX_SOUNDS_DIR}/complete.oga`,
+  Morse:     `${LINUX_SOUNDS_DIR}/message.oga`,
+  Ping:      `${LINUX_SOUNDS_DIR}/message.oga`,
+  Pop:       `${LINUX_SOUNDS_DIR}/dialog-information.oga`,
+  Purr:      `${LINUX_SOUNDS_DIR}/service-login.oga`,
+  Sosumi:    `${LINUX_SOUNDS_DIR}/dialog-warning.oga`,
+  Submarine: `${LINUX_SOUNDS_DIR}/alarm-clock-elapsed.oga`,
+  Tink:      `${LINUX_SOUNDS_DIR}/bell.oga`,
+};
 
 function resolveSound(name, defaultMac, defaultWin) {
   if (USE_WIN) return WIN_SOUNDS[name] || defaultWin;
+  if (IS_LINUX) return LINUX_SOUNDS[name] || `${LINUX_SOUNDS_DIR}/complete.oga`;
   return MACOS_SOUNDS[name] || defaultMac;
 }
 
@@ -66,6 +85,8 @@ process.stdin.on("end", () => {
       if (USE_WIN) {
         const ps = `$s='${sound}'; if(Test-Path $s){(New-Object Media.SoundPlayer $s).PlaySync()}else{[console]::Beep(800,300)}`;
         execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
+      } else if (IS_LINUX) {
+        execSync(`paplay "${sound}" 2>/dev/null || aplay "${sound}" 2>/dev/null`, { stdio: "ignore", timeout: 5000 });
       } else {
         execSync(`afplay "${sound}"`, { stdio: "ignore" });
       }
@@ -78,6 +99,8 @@ process.stdin.on("end", () => {
       if (USE_WIN) {
         const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','Claude is asking you a question.',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
         execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
+      } else if (IS_LINUX) {
+        execSync(`notify-send "Claude Notifier" "Claude is asking you a question." 2>/dev/null`, { stdio: "ignore", timeout: 5000 });
       } else {
         execSync(`osascript -e 'display notification "Claude is asking you a question." with title "Claude Notifier"'`, { stdio: "ignore" });
       }
