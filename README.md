@@ -6,7 +6,7 @@ Plays a sound and shows a notification when [Claude Code](https://claude.com/cla
 
 Stop watching the screen — go grab a coffee and let Claude ping you when it needs you.
 
-Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, and **WSL**.
+Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, **WSL**, and **Linux**.
 
 ## Install
 
@@ -90,6 +90,7 @@ Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add 
 **Sound presets:**
 - macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
 - Windows: Windows Notify, tada, chimes, chord, ding, notify, ringin, Windows Background
+- Linux: same names as macOS — each is mapped to a freedesktop XDG sound under `/usr/share/sounds/freedesktop/stereo/`
 
 The global **mute toggle** (status bar speaker icon or `Claude Notifier: Toggle Sound` in the command palette) overrides all per-event settings.
 
@@ -105,7 +106,7 @@ Three [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) 
 
 Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCode settings) to determine which sound to play and whether to show notifications.
 
-On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds.
+On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `paplay` (with `aplay` as fallback) for audio and `notify-send` for notifications — install `libnotify` (`notify-send`), a PulseAudio/PipeWire or ALSA stack, and the `sound-theme-freedesktop` package if they aren't already present.
 
 ### Clickable macOS notifications (optional)
 
@@ -142,6 +143,7 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 | macOS    | Yes              | Yes         | Node.js                                                   |
 | Windows  | Yes              | VSCode only | PowerShell                                                |
 | WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
+| Linux    | Yes              | Yes         | Node.js (uses `paplay`/`aplay` and `notify-send`)         |
 
 ## Contributing
 
@@ -149,7 +151,7 @@ Bug reports and feature requests are welcome — please [open an issue](https://
 
 - Branch from `main` and keep changes focused — one fix or feature per PR.
 - Follow the existing commit style (`fix:`, `feat:`, `chore:` …).
-- Test your changes locally on the platform(s) you've touched (macOS, Windows, or WSL) and note what you verified in the PR description.
+- Test your changes locally on the platform(s) you've touched (macOS, Windows, WSL, or Linux) and note what you verified in the PR description.
 
 ### Contributors
 
