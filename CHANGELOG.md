@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0] - 2026-05-14
+
+Contributions in this release by [@collectifweb](https://github.com/collectifweb).
+
+### Added
+
+- Native Linux support for sound and OS notifications. On non-WSL Linux, hooks now use `paplay` (with `aplay` as fallback) for audio and `notify-send` for notifications, with the macOS sound preset names mapped to freedesktop XDG sounds under `/usr/share/sounds/freedesktop/stereo/`. Previously, native Linux fell through to the macOS-only `afplay` path and failed silently. ([#13](https://github.com/ashmitb95/claude-notifier/pull/13))
+
+### Documentation
+
+- README updated to list Linux alongside macOS, Windows, and WSL, including runtime dependencies (`libnotify`, PulseAudio/PipeWire or ALSA, `sound-theme-freedesktop`) and the new platform-support row.
+
 ## [2.3.1] - 2026-05-03
 
 ### Documentation
