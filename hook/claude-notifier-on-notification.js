@@ -13,9 +13,12 @@ const IS_WSL = !IS_WIN && process.platform === "linux" && (() => {
 })();
 const USE_WIN = IS_WIN || IS_WSL;
 const PS_BIN = IS_WSL ? "powershell.exe" : "powershell";
+const IS_LINUX = !IS_WIN && !IS_WSL && process.platform === "linux";
 
 const SOUND = USE_WIN
   ? "C:\\Windows\\Media\\Windows Notify.wav"
+  : IS_LINUX
+  ? "/usr/share/sounds/freedesktop/stereo/bell.oga"
   : "/System/Library/Sounds/Glass.aiff";
 
 let raw = "";
@@ -33,6 +36,8 @@ process.stdin.on("end", () => {
     if (USE_WIN) {
       const ps = `$s='${SOUND}'; if(Test-Path $s){(New-Object Media.SoundPlayer $s).PlaySync()}else{[console]::Beep(800,300)}`;
       execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
+    } else if (IS_LINUX) {
+      execSync(`paplay "${SOUND}" 2>/dev/null || aplay "${SOUND}" 2>/dev/null`, { stdio: "ignore", timeout: 5000 });
     } else {
       execSync(`afplay "${SOUND}"`, { stdio: "ignore" });
     }
@@ -45,6 +50,9 @@ process.stdin.on("end", () => {
       const safeMsg = message.replace(/'/g, "''");
       const ps = `Add-Type -AssemblyName System.Windows.Forms; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; $n.ShowBalloonTip(3000,'Claude Notifier','${safeMsg}',[System.Windows.Forms.ToolTipIcon]::None); Start-Sleep -m 500; $n.Dispose()`;
       execSync(`${PS_BIN} -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(ps, "utf16le").toString("base64")}`, { stdio: "ignore", timeout: 5000 });
+    } else if (IS_LINUX) {
+      const safeMsg = message.replace(/"/g, '\\"');
+      execSync(`notify-send "Claude Notifier" "${safeMsg}" 2>/dev/null`, { stdio: "ignore", timeout: 5000 });
     } else {
       execSync(`osascript -e 'display notification "${message}" with title "Claude Notifier"'`, { stdio: "ignore" });
     }
