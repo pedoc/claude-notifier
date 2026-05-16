@@ -18,11 +18,22 @@ REPO_RAW="https://raw.githubusercontent.com/ashmitb95/claude-notifier/main"
 
 echo "Installing Claude Notifier..."
 
-mkdir -p "$HOOKS_DIR"
+mkdir -p "$HOOKS_DIR" "$HOOKS_DIR/_lib"
 
-for script in claude-notifier-on-stop.js claude-notifier-on-permission.js claude-notifier-on-question.js; do
+for script in claude-notifier-on-stop.js claude-notifier-on-permission.js claude-notifier-on-question.js claude-notifier-on-prompt.js; do
   curl -fsSL "$REPO_RAW/hook/$script" -o "$HOOKS_DIR/$script"
   chmod +x "$HOOKS_DIR/$script"
+done
+
+# Shared hook library (required by the hook scripts since v3.0)
+for lib in platform.js paths.js sounds.js config.js play.js notify.js signal.js active.js; do
+  curl -fsSL "$REPO_RAW/hook/_lib/$lib" -o "$HOOKS_DIR/_lib/$lib"
+done
+
+# Bundled fallback sounds (played when the configured system sound is missing)
+mkdir -p "$HOOKS_DIR/_lib/sounds"
+for wav in task-complete.wav needs-input.wav question.wav; do
+  curl -fsSL "$REPO_RAW/media/sounds/$wav" -o "$HOOKS_DIR/_lib/sounds/$wav"
 done
 
 if [ ! -f "$SETTINGS_FILE" ]; then
@@ -32,6 +43,7 @@ fi
 STOP_HOOK="$HOOKS_DIR/claude-notifier-on-stop.js"
 PERM_HOOK="$HOOKS_DIR/claude-notifier-on-permission.js"
 QUESTION_HOOK="$HOOKS_DIR/claude-notifier-on-question.js"
+PROMPT_HOOK="$HOOKS_DIR/claude-notifier-on-prompt.js"
 
 node -e "
 const fs = require('fs');
@@ -39,7 +51,7 @@ const settings = JSON.parse(fs.readFileSync('$SETTINGS_FILE', 'utf-8'));
 if (!settings.hooks) settings.hooks = {};
 
 // Clean stale entries from all hook types
-for (const t of ['Stop', 'PermissionRequest', 'PreToolUse', 'Notification']) {
+for (const t of ['Stop', 'PermissionRequest', 'PreToolUse', 'Notification', 'UserPromptSubmit']) {
   if (settings.hooks[t]) {
     settings.hooks[t] = settings.hooks[t].filter(
       e => !e.hooks?.some(h => h.command?.includes('claude-notifier'))
@@ -65,6 +77,12 @@ if (!settings.hooks.PreToolUse) settings.hooks.PreToolUse = [];
 settings.hooks.PreToolUse.push({
   matcher: 'AskUserQuestion',
   hooks: [{ type: 'command', command: 'node \"$QUESTION_HOOK\"' }]
+});
+
+// UserPromptSubmit hook — coordination only, no sound (advances stage dedup)
+if (!settings.hooks.UserPromptSubmit) settings.hooks.UserPromptSubmit = [];
+settings.hooks.UserPromptSubmit.push({
+  hooks: [{ type: 'command', command: 'node \"$PROMPT_HOOK\"' }]
 });
 
 fs.writeFileSync('$SETTINGS_FILE', JSON.stringify(settings, null, 2) + '\n');
