@@ -7,7 +7,12 @@ import * as stage from "./stage";
 import { log } from "../log";
 import { getOwnWorkspaceFolders, cwdMatchesFolder } from "../routing/cwd";
 import { rememberDone, getRememberedDone, revealClaudeTab } from "../routing/focus";
-import { getEventLevel, getEventConfig, getSoundVolume, getMinTaskDurationThreshold } from "../settings/sync";
+import {
+  getEventLevel,
+  getEventConfig,
+  getSoundVolume,
+  getMinTaskDurationThreshold,
+} from "../settings/sync";
 import { playLocalSound } from "../notifications/sound";
 import { showLocalNotification } from "../notifications/local";
 import { playRemoteSound } from "../notifications/remote";

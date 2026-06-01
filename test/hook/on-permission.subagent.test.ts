@@ -37,11 +37,7 @@ describe("hook: on-permission — subagent suppression", () => {
 
   it("main-agent permission (no agent_id): fires normally, signal written", () => {
     writeConfig(true);
-    const res = runHook(
-      SCRIPT,
-      { session_id: "s-1", tool_name: "Bash" },
-      home.root
-    );
+    const res = runHook(SCRIPT, { session_id: "s-1", tool_name: "Bash" }, home.root);
     expect(res.status).toBe(0);
     expect(readSignal(home.signalFile)).toMatch(/^input \d+ s-1$/);
   });

@@ -59,12 +59,9 @@ Auto-formatted by Prettier — run `npm run format` before committing. ESLint en
 
 ## Releases
 
-Maintainer-driven and manual:
+Releases are maintainer driven and manual. 
+A release is expected shortly after a contributor PR is merged.
 
-1. Bump `version` in `package.json`.
-2. Prepend a release section to `CHANGELOG.md`.
-3. `npm run package` produces the `.vsix`.
-4. Tag (`git tag vX.Y.Z`), push, then `npx @vscode/vsce publish` from a checkout of the tagged commit.
 
 ## Reporting a bug
 

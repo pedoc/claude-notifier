@@ -36,11 +36,7 @@ describe("hook: on-question — minTaskDurationThreshold", () => {
   it("suppresses sound + popup when elapsed < threshold (signal still written)", () => {
     writeConfig(10);
     writeMarker("sess-1", 1_000);
-    const res = runHook(
-      SCRIPT,
-      { session_id: "sess-1", tool_name: "AskUserQuestion" },
-      home.root
-    );
+    const res = runHook(SCRIPT, { session_id: "sess-1", tool_name: "AskUserQuestion" }, home.root);
     expect(res.status).toBe(0);
     expect(readSignal(home.signalFile)).toMatch(/^question /);
   });
@@ -48,11 +44,7 @@ describe("hook: on-question — minTaskDurationThreshold", () => {
   it("fires when elapsed >= threshold", () => {
     writeConfig(10);
     writeMarker("sess-1", 20_000);
-    const res = runHook(
-      SCRIPT,
-      { session_id: "sess-1", tool_name: "AskUserQuestion" },
-      home.root
-    );
+    const res = runHook(SCRIPT, { session_id: "sess-1", tool_name: "AskUserQuestion" }, home.root);
     expect(res.status).toBe(0);
     expect(readSignal(home.signalFile)).toMatch(/^question /);
   });

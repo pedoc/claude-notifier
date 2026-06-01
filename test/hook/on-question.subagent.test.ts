@@ -37,11 +37,7 @@ describe("hook: on-question — subagent suppression", () => {
 
   it("main-agent question (no agent_id): fires normally, signal written", () => {
     writeConfig(true);
-    const res = runHook(
-      SCRIPT,
-      { session_id: "s-1", tool_name: "AskUserQuestion" },
-      home.root
-    );
+    const res = runHook(SCRIPT, { session_id: "s-1", tool_name: "AskUserQuestion" }, home.root);
     expect(res.status).toBe(0);
     expect(readSignal(home.signalFile)).toMatch(/^question \d+ s-1$/);
   });

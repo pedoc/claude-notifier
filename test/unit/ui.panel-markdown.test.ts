@@ -37,7 +37,9 @@ describe("buildPanelMarkdown", () => {
   it("includes a setVolume command link for each preset (0/25/50/75/100/150/200)", () => {
     const md = buildPanelMarkdown(baseState).value;
     for (const v of [0, 0.25, 0.5, 0.75, 1, 1.5, 2]) {
-      expect(md).toContain(`command:claudeNotifier.setVolume?${encodeURIComponent(JSON.stringify([v]))}`);
+      expect(md).toContain(
+        `command:claudeNotifier.setVolume?${encodeURIComponent(JSON.stringify([v]))}`
+      );
     }
   });
 

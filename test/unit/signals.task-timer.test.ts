@@ -150,8 +150,14 @@ describe("task-timer (extension side)", () => {
       fs.mkdirSync(tmpTaskDir, { recursive: true });
       const oldFile = path.join(tmpTaskDir, "old.json");
       const freshFile = path.join(tmpTaskDir, "fresh.json");
-      fs.writeFileSync(oldFile, JSON.stringify({ startedAt: Date.now() - 50_000, sessionId: "old" }));
-      fs.writeFileSync(freshFile, JSON.stringify({ startedAt: Date.now() - 1_000, sessionId: "fresh" }));
+      fs.writeFileSync(
+        oldFile,
+        JSON.stringify({ startedAt: Date.now() - 50_000, sessionId: "old" })
+      );
+      fs.writeFileSync(
+        freshFile,
+        JSON.stringify({ startedAt: Date.now() - 1_000, sessionId: "fresh" })
+      );
       cleanupStaleMarkers(10_000);
       expect(fs.existsSync(oldFile)).toBe(false);
       expect(fs.existsSync(freshFile)).toBe(true);
