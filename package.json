@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "icon": "media/icon.png",
   "publisher": "SingularityInc",
   "repository": {
@@ -28,6 +28,26 @@
       {
         "command": "claudeNotifier.installTerminalNotifier",
         "title": "Claude Notifier: Install terminal-notifier (clickable macOS notifications)"
+      },
+      {
+        "command": "claudeNotifier.previewEventSound",
+        "title": "Claude Notifier: Preview Sound…"
+      },
+      {
+        "command": "claudeNotifier.pickEventSound",
+        "title": "Claude Notifier: Choose Sound…"
+      },
+      {
+        "command": "claudeNotifier.setVolume",
+        "title": "Claude Notifier: Set Volume"
+      },
+      {
+        "command": "claudeNotifier.setThreshold",
+        "title": "Claude Notifier: Set Threshold"
+      },
+      {
+        "command": "claudeNotifier.openSettings",
+        "title": "Claude Notifier: Open Settings"
       }
     ],
     "configuration": {
@@ -171,12 +191,70 @@
           "default": "Funk",
           "description": "Sound preset when Claude asks a question. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
         },
+        "claudeNotifier.subagentCompleted.level": {
+          "type": "string",
+          "enum": [
+            "sound+popup",
+            "sound",
+            "popup",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Play sound and show notification",
+            "Play sound only",
+            "Show notification only",
+            "Disabled"
+          ],
+          "default": "off",
+          "description": "Notification level when a Task subagent finishes. Off by default — subagents are typically internal detail."
+        },
+        "claudeNotifier.subagentCompleted.sound": {
+          "type": "string",
+          "enum": [
+            "Basso",
+            "Blow",
+            "Bottle",
+            "Frog",
+            "Funk",
+            "Glass",
+            "Hero",
+            "Morse",
+            "Ping",
+            "Pop",
+            "Purr",
+            "Sosumi",
+            "Submarine",
+            "Tink",
+            "Windows Notify",
+            "tada",
+            "chimes",
+            "chord",
+            "ding",
+            "notify",
+            "ringin",
+            "Windows Background"
+          ],
+          "default": "Pop",
+          "description": "Sound preset when a Task subagent finishes. macOS: Basso–Tink. Windows: Windows Notify–Windows Background."
+        },
         "claudeNotifier.soundVolume": {
           "type": "number",
           "default": 1,
           "minimum": 0,
           "maximum": 2,
           "description": "Volume multiplier applied to all notification sounds. 1 = system default, 2 = boosted (~200%). Honored on Linux (paplay) and macOS (afplay). Windows ignores this — Media.SoundPlayer has no volume API."
+        },
+        "claudeNotifier.minTaskDurationThreshold": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "Suppress notification sounds and popups for tasks that complete in less than this many seconds. Counted from when you submit the prompt. 0 disables the feature (all notifications fire normally)."
+        },
+        "claudeNotifier.suppressSubagentInteractions": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, permission and question hooks fired from inside a Task subagent (detected via the agent_id field in the hook payload) are silenced — no sound, no popup. The main agent's own permission/question prompts still fire normally. Useful in auto-accept mode where subagent prompts are noise."
         },
         "claudeNotifier.doneDebounceMs": {
           "type": "number",

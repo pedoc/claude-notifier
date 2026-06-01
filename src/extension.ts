@@ -7,7 +7,15 @@ import { initDiscovery, installTerminalNotifierFlow } from "./notifications/term
 import { writeOwnPidFile, cleanStalePidFiles } from "./routing/cwd";
 import { startFocusSignalWatcher } from "./routing/focus";
 import { startSignalWatcher } from "./signals/dispatch";
-import { createStatusBar, toggleSound } from "./ui/status-bar";
+import {
+  createStatusBar,
+  toggleSound,
+  setVolume,
+  setThreshold,
+  openSettings,
+} from "./ui/status-bar";
+import { previewEventSoundCommand, pickEventSoundCommand } from "./ui/sound-picker";
+import { cleanupStaleMarkers } from "./signals/task-timer";
 import { initLogger, log } from "./log";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -15,6 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
   log("activate: extensionPath=", context.extensionPath);
   setupHooks(context.extensionPath);
   syncConfig();
+  cleanupStaleMarkers(24 * 60 * 60 * 1000);
   initDiscovery();
 
   // Register this window as an active instance so hook scripts defer
@@ -39,6 +48,11 @@ export function activate(context: vscode.ExtensionContext) {
       "claudeNotifier.installTerminalNotifier",
       installTerminalNotifierFlow
     ),
+    vscode.commands.registerCommand("claudeNotifier.previewEventSound", previewEventSoundCommand),
+    vscode.commands.registerCommand("claudeNotifier.pickEventSound", pickEventSoundCommand),
+    vscode.commands.registerCommand("claudeNotifier.setVolume", (v: number) => setVolume(v)),
+    vscode.commands.registerCommand("claudeNotifier.setThreshold", () => setThreshold()),
+    vscode.commands.registerCommand("claudeNotifier.openSettings", () => openSettings()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("claudeNotifier")) {
         syncConfig();

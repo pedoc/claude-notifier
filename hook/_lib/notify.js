@@ -44,6 +44,10 @@ function findTerminalNotifier() {
  * can't carry a click action; their click defaults to Script Editor).
  */
 function showNotification(message, opts = {}) {
+  // Test-isolation guard: macOS resolves terminal-notifier via absolute paths
+  // (see findTerminalNotifier), which bypasses the test harness's PATH=/
+  // stripping. Setting this env var short-circuits before any OS spawn.
+  if (process.env.CLAUDE_NOTIFIER_TEST_SUPPRESS_NOTIFY) return;
   // cmux posts its own banner for the same event; skip the popup to avoid
   // double-notifying. See _lib/cmux.js.
   if (isInsideCmux()) return;
