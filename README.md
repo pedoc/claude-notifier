@@ -152,7 +152,7 @@ Five [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) a
 
 Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCode settings) to determine which sound to play and whether to show notifications.
 
-On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `paplay` (with `aplay` as fallback) for audio and `notify-send` for notifications — install `libnotify` (`notify-send`), a PulseAudio/PipeWire or ALSA stack, and the `sound-theme-freedesktop` package if they aren't already present.
+On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `pw-play` (PipeWire) or `paplay` (PulseAudio) for audio, falling back to `aplay`, and `notify-send` for notifications — install `libnotify` (`notify-send`), a PipeWire (`pipewire-bin` / `pipewire-audio`) or PulseAudio (`pulseaudio-utils`) stack, and the `sound-theme-freedesktop` package if they aren't already present. The sounds are Ogg (`.oga`) files; `aplay` cannot decode them (it plays static), so a PipeWire or PulseAudio player is recommended.
 
 ### Behavior
 
@@ -196,7 +196,7 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 | macOS    | Yes              | Yes         | Node.js                                                   |
 | Windows  | Yes              | VSCode only | PowerShell                                                |
 | WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
-| Linux    | Yes              | Yes         | Node.js (uses `paplay`/`aplay` and `notify-send`)         |
+| Linux    | Yes              | Yes         | Node.js (uses `pw-play`/`paplay`/`aplay` and `notify-send`) |
 
 ## Contributing
 

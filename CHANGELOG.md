@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.2] - 2026-06-05
+
+### Fixed
+
+- **Static instead of sound on Linux without PulseAudio.** The Linux audio path tried `paplay` and fell back to `aplay`. The preset sounds are Ogg (`.oga`) files, which `aplay` (a raw ALSA/WAV player) cannot decode — it renders them as static. On modern PipeWire-based distros (e.g. Ubuntu 24.04+) `paplay` isn't installed by default, so playback fell through to `aplay` and produced static in every scenario. The player chain now tries `pw-play` (PipeWire) first, then `paplay` (PulseAudio), then `aplay`, so audio works out of the box on PipeWire systems. This bug had been latent since Linux support was added in 2.4.0 and was exposed by distros moving to PipeWire. ([#49](https://github.com/ashmitb95/claude-notifier/issues/49))
+
 ## [3.3.1] - 2026-06-05
 
 ### Fixed
