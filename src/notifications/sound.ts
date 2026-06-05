@@ -64,12 +64,15 @@ export function playLocalSound(
       { timeout: 5000 }
     );
   } else if (IS_LINUX) {
-    // paplay --volume uses a 16-bit scale where 65536 = 100%. aplay has no
-    // matching flag, so the fallback path plays at system volume.
+    // The sounds are Ogg (.oga). Decode them with pw-play (PipeWire, default on
+    // modern distros) or paplay (PulseAudio); aplay is a last resort only — it
+    // is a raw ALSA/WAV player and renders .oga as static (#49). Volume flags
+    // differ: pw-play takes a 0.0–1.0+ linear factor, paplay a 16-bit scale
+    // where 65536 = 100%; aplay has none, so it plays at system volume.
     const soundPath = LINUX_SOUNDS[soundName] || `${LINUX_SOUNDS_DIR}/complete.oga`;
     const paVolume = Math.round(v * 65536);
     exec(
-      `paplay --volume=${paVolume} "${soundPath}" 2>/dev/null || aplay "${soundPath}" 2>/dev/null`,
+      `pw-play --volume=${v} "${soundPath}" 2>/dev/null || paplay --volume=${paVolume} "${soundPath}" 2>/dev/null || aplay "${soundPath}" 2>/dev/null`,
       { timeout: 5000 }
     );
   } else {
