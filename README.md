@@ -189,6 +189,18 @@ New-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted"   # mute
 Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 ```
 
+## Disable per session (`CLAUDE_NOTIFIER_DISABLE`)
+
+The mute flag above is machine-wide. To silence the hooks for a **single
+session only** — e.g. when SSHing into a shared host so your sessions don't
+play sounds on someone else's machine — set `CLAUDE_NOTIFIER_DISABLE` in that
+shell. When set (to any value other than empty/`0`/`false`), every hook exits
+without sound, popup, or signal; sessions in other shells are unaffected.
+
+```sh
+export CLAUDE_NOTIFIER_DISABLE=1   # add to your shell rc to make it permanent
+```
+
 ## Platform support
 
 | Platform | VSCode Extension | CLI Install | Hook runner                                               |

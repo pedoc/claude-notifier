@@ -7,6 +7,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 $raw = [Console]::In.ReadToEnd()
 try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 
+if (Test-NotifierDisabled) { exit 0 }
+
 Write-NotifierSignal -Reason 'prompt' -SessionId $data.session_id
 Save-NotifierTaskStart -SessionId $data.session_id
 
