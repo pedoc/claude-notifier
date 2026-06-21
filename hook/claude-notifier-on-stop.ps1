@@ -7,6 +7,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $raw = [Console]::In.ReadToEnd()
 try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 
+if (Test-NotifierDisabled) { exit 0 }
 if ($data.stop_hook_active) { exit 0 }
 if (Test-NotifierMuted) { exit 0 }
 

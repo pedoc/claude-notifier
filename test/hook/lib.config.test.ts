@@ -45,6 +45,35 @@ describe("hook/_lib/config — isMuted", () => {
   });
 });
 
+describe("hook/_lib/config — isDisabled", () => {
+  const ORIG = process.env.CLAUDE_NOTIFIER_DISABLE;
+  afterAll(() => {
+    if (ORIG === undefined) delete process.env.CLAUDE_NOTIFIER_DISABLE;
+    else process.env.CLAUDE_NOTIFIER_DISABLE = ORIG;
+  });
+  beforeEach(() => {
+    delete process.env.CLAUDE_NOTIFIER_DISABLE;
+  });
+
+  it("false when env var is unset", () => {
+    expect(config.isDisabled()).toBe(false);
+  });
+
+  it("false for empty, '0', and 'false' (case-insensitive)", () => {
+    for (const v of ["", "0", "false", "False", "FALSE"]) {
+      process.env.CLAUDE_NOTIFIER_DISABLE = v;
+      expect(config.isDisabled()).toBe(false);
+    }
+  });
+
+  it("true for any other non-empty value", () => {
+    for (const v of ["1", "true", "yes", "on"]) {
+      process.env.CLAUDE_NOTIFIER_DISABLE = v;
+      expect(config.isDisabled()).toBe(true);
+    }
+  });
+});
+
 describe("hook/_lib/config — readConfig", () => {
   it("returns null when config file does not exist", () => {
     expect(config.readConfig()).toBeNull();

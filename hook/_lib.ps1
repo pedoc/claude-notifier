@@ -47,6 +47,18 @@ function Test-NotifierMuted() {
     return (Test-Path $LibMuteFlag)
 }
 
+# Per-session opt-out: set CLAUDE_NOTIFIER_DISABLE in the shell to silence all
+# hook output (sound, popup, and signal) for that session only. Unlike the
+# machine-wide mute flag, this is scoped to the process environment, so a user
+# on a shared host can disable just their own sessions. Any non-empty value
+# other than "0"/"false" counts as disabled.
+function Test-NotifierDisabled() {
+    $v = $env:CLAUDE_NOTIFIER_DISABLE
+    if (-not $v) { return $false }
+    if ($v -eq '0' -or $v.ToLower() -eq 'false') { return $false }
+    return $true
+}
+
 # Play a sound file synchronously. Falls back to $Fallback if $Path doesn't
 # exist (e.g. user picked a sound that isn't installed); beeps if neither
 # exists. Silently swallows errors — sound failure should never break a hook.

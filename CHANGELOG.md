@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.0] - 2026-06-21
+
+### Added
+
+- **`CLAUDE_NOTIFIER_DISABLE` environment variable** for per-session opt-out. Setting it (to any value other than empty/`0`/`false`) in a shell makes every hook exit silently — no sound, popup, or signal — for sessions in that shell only, leaving other sessions and the machine-wide mute flag untouched. Intended for shared SSH hosts, where the host's hooks otherwise play sounds for every user's sessions. ([#63](https://github.com/ashmitb95/claude-notifier/issues/63))
+
 ## [3.3.2] - 2026-06-05
 
 ### Fixed

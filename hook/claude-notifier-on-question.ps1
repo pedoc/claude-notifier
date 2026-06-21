@@ -6,6 +6,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 $raw = [Console]::In.ReadToEnd()
 try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
 
+if (Test-NotifierDisabled) { exit 0 }
+
 # Defense-in-depth: bail if a misconfigured matcher routes other tools here.
 if ($data.tool_name -ne 'AskUserQuestion') { exit 0 }
 
