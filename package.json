@@ -263,6 +263,18 @@
           "maximum": 10000,
           "deprecationMessage": "Deprecated and ignored. Per-session stage dedup replaces it. Safe to delete from your settings.",
           "description": "Deprecated and ignored. Per-session stage dedup handles rapid 'done' signal coalescing."
+        },
+        "claudeNotifier.remoteAudio.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Play notification sounds on your **local** machine when Claude runs on a **remote** host (SSH, WSL, dev container). Requires the `cn-daemon` helper running locally and an SSH reverse forward — see [docs/REMOTE_HOSTS.md](https://github.com/ashmitb95/claude-notifier/blob/main/docs/REMOTE_HOSTS.md). When off, remote sessions fall back to the terminal bell."
+        },
+        "claudeNotifier.remoteAudio.port": {
+          "type": "number",
+          "default": 47291,
+          "minimum": 1,
+          "maximum": 65535,
+          "markdownDescription": "Loopback port the local `cn-daemon` listens on and the reverse forward targets (`RemoteForward <port> localhost:<port>`). Only change this if 47291 conflicts with another service."
         }
       }
     }

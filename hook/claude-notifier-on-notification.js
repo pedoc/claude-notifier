@@ -4,8 +4,8 @@
 // notification. Uses fixed sound (not config-driven) — this hook fires
 // before the PermissionRequest hook can react.
 const { isMuted, readConfig } = require("./_lib/config");
-const { resolveSound, BUNDLED_FALLBACK } = require("./_lib/sounds");
-const { playSound } = require("./_lib/play");
+const { BUNDLED_FALLBACK } = require("./_lib/sounds");
+const { emitSound } = require("./_lib/emit");
 const { showNotification } = require("./_lib/notify");
 const { writeSignal } = require("./_lib/signal");
 
@@ -25,13 +25,19 @@ process.stdin.on("end", () => {
 
   // Fixed sound mapping (Glass on macOS, Notify on Windows, freedesktop bell
   // on Linux — resolveSound's table happens to map "Glass" to all three).
-  const sound = resolveSound(
+  const config = readConfig();
+  const volume = config?.soundVolume ?? 1;
+  emitSound(
+    "input",
     "Glass",
-    "/System/Library/Sounds/Glass.aiff",
-    "C:\\Windows\\Media\\Windows Notify.wav"
+    {
+      mac: "/System/Library/Sounds/Glass.aiff",
+      win: "C:\\Windows\\Media\\Windows Notify.wav",
+      fallback: BUNDLED_FALLBACK.needsPermission,
+    },
+    volume,
+    config
   );
-  const volume = readConfig()?.soundVolume ?? 1;
-  playSound(sound, BUNDLED_FALLBACK.needsPermission, volume);
 
   const message = input.message || "Claude needs your permission.";
   showNotification(message);

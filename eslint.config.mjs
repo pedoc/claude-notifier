@@ -4,7 +4,7 @@ import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["out/**", "node_modules/**", "coverage/**", "*.vsix"],
+    ignores: ["out/**", "node_modules/**", "coverage/**", "*.vsix", "spike/**", "daemon/**"],
   },
   js.configs.recommended,
   // TypeScript with type-aware rules — applies only to .ts files in the

@@ -12,10 +12,11 @@ import {
   getEventConfig,
   getSoundVolume,
   getMinTaskDurationThreshold,
+  getRemoteAudio,
 } from "../settings/sync";
 import { playLocalSound } from "../notifications/sound";
 import { showLocalNotification } from "../notifications/local";
-import { playRemoteSound } from "../notifications/remote";
+import { playRemoteSound, pushRemoteAudio } from "../notifications/remote";
 import { shouldSuppressForThreshold } from "./task-timer";
 
 let watcher: fs.FSWatcher | null = null;
@@ -132,7 +133,13 @@ function showNotification(reason: string, cwd: string): void {
     const level = getEventLevel("needsPermission");
     const threshold = getMinTaskDurationThreshold();
     if (shouldSuppressForThreshold(lastSignalSessionId, threshold)) return;
-    if (isRemote && (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND)) {
+    // In remote-audio mode the permission hook pushes this sound to the daemon;
+    // the extension only falls back to the terminal bell when it's off.
+    if (
+      isRemote &&
+      (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND) &&
+      !getRemoteAudio().enabled
+    ) {
       playRemoteSound();
     }
     if (level === LEVELS.SOUND_POPUP || level === LEVELS.POPUP) {
@@ -142,7 +149,13 @@ function showNotification(reason: string, cwd: string): void {
     const level = getEventLevel("asksQuestion");
     const threshold = getMinTaskDurationThreshold();
     if (shouldSuppressForThreshold(lastSignalSessionId, threshold)) return;
-    if (isRemote && (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND)) {
+    // In remote-audio mode the question hook pushes this sound to the daemon;
+    // the extension only falls back to the terminal bell when it's off.
+    if (
+      isRemote &&
+      (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND) &&
+      !getRemoteAudio().enabled
+    ) {
       playRemoteSound();
     }
     if (level === LEVELS.SOUND_POPUP || level === LEVELS.POPUP) {
@@ -153,10 +166,11 @@ function showNotification(reason: string, cwd: string): void {
     const threshold = getMinTaskDurationThreshold();
     if (shouldSuppressForThreshold(lastSignalSessionId, threshold)) return;
     if (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND) {
+      const cfg = getEventConfig("taskCompleted");
       if (isRemote) {
-        playRemoteSound();
+        // Remote-audio mode: push to the daemon; otherwise terminal-bell fallback.
+        if (!pushRemoteAudio("done", cfg.sound, getSoundVolume())) playRemoteSound();
       } else {
-        const cfg = getEventConfig("taskCompleted");
         playLocalSound(
           cfg.sound,
           "/System/Library/Sounds/Hero.aiff",
@@ -182,10 +196,11 @@ function showNotification(reason: string, cwd: string): void {
     const threshold = getMinTaskDurationThreshold();
     if (shouldSuppressForThreshold(lastSignalSessionId, threshold)) return;
     if (level === LEVELS.SOUND_POPUP || level === LEVELS.SOUND) {
+      const cfg = getEventConfig("subagentCompleted");
       if (isRemote) {
-        playRemoteSound();
+        // Remote-audio mode: push to the daemon; otherwise terminal-bell fallback.
+        if (!pushRemoteAudio("subagent_done", cfg.sound, getSoundVolume())) playRemoteSound();
       } else {
-        const cfg = getEventConfig("subagentCompleted");
         playLocalSound(
           cfg.sound,
           "/System/Library/Sounds/Pop.aiff",

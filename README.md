@@ -173,6 +173,17 @@ Or use the bundled command — open the Command Palette and run **"Claude Notifi
 
 When `terminal-notifier` is present, the extension uses it automatically. When it's not, the extension falls back to the standard `osascript` notification (everything still works — clicks just open Script Editor).
 
+### Remote hosts (SSH, WSL, dev containers)
+
+When Claude runs on a **remote host**, notification sounds can now play on your
+**local** machine instead of the (usually headless) remote — with your normal
+sound presets and volume, no terminal bell. A small `cn-daemon` helper runs
+locally and the remote pushes events to it over an SSH reverse forward.
+
+This is **opt-in**: existing local setups are unaffected. See
+**[docs/REMOTE_HOSTS.md](docs/REMOTE_HOSTS.md)** for the one-time setup (install
+the daemon, add a `RemoteForward` line, enable `claudeNotifier.remoteAudio`).
+
 ## Mute/unmute (CLI)
 
 **macOS / Linux / WSL:**

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Remote-audio mode — hear notifications when Claude runs on a remote host.** When Claude Code runs over SSH / WSL / in a dev container, notification sounds can now play on your **local** machine instead of the (usually headless) remote — with your normal presets and volume, and no terminal bell. A small dependency-free helper, `cn-daemon` (Go, ~2.4 MB, source in [`daemon/`](daemon/), published per-platform to GitHub Releases by [`daemon-release.yml`](.github/workflows/daemon-release.yml)), runs locally and the remote pushes events to it over an SSH reverse forward. Opt-in via `claudeNotifier.remoteAudio.enabled` (default `false`) — existing local setups are unaffected. Hooks route all sound through a single `hook/_lib/emit.js` chokepoint that pushes when remote-audio is on and plays locally otherwise; the extension pushes the "done" sound the same way, falling back to the terminal bell when off. Setup guide: [docs/REMOTE_HOSTS.md](docs/REMOTE_HOSTS.md). Addresses the long-standing remote-no-sound reports ([#58](https://github.com/ashmitb95/claude-notifier/issues/58), [#3](https://github.com/ashmitb95/claude-notifier/issues/3)).
+
 ## [3.3.1] - 2026-06-05
 
 ### Fixed
