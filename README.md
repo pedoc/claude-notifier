@@ -1,6 +1,7 @@
 # Claude Notifier
 
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/SingularityInc.claude-notifier)](https://marketplace.visualstudio.com/items?itemName=SingularityInc.claude-notifier)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/ashmitb95)
 
 Plays a sound and shows a notification when [Claude Code](https://claude.com/claude-code) finishes a task, needs permission, or asks a question.
 
@@ -10,11 +11,10 @@ Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Cl
 
 ## What's new — 3.5.0
 
-![Hover the Claude entry in the status bar to open the control panel](media/popup-screen.png)
-
 - **Remote audio.** When Claude runs on a remote host (SSH, WSL, dev container), notification sounds now play on your **local** machine instead of the headless remote — see [Remote hosts](#remote-hosts-ssh-wsl-dev-containers).
 - **Per-session disable.** Set `CLAUDE_NOTIFIER_DISABLE` to silence the notifier for a single shell/session — handy on shared SSH hosts (see [below](#disable-per-session-claude_notifier_disable)).
 - **Status-bar control panel.** Hover the **Claude** entry in the status bar for volume, per-event sound preview/swap, and the minimum-task-duration threshold.
+![Hover the Claude entry in the status bar to open the control panel](media/popup-screen.png)
 
 ## Install
 
