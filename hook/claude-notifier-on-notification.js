@@ -3,7 +3,7 @@
 // Plays the "needs input" sound when Claude posts a permission_prompt
 // notification. Uses fixed sound (not config-driven) — this hook fires
 // before the PermissionRequest hook can react.
-const { isMuted, readConfig } = require("./_lib/config");
+const { isMuted, isDisabled, readConfig } = require("./_lib/config");
 const { BUNDLED_FALLBACK } = require("./_lib/sounds");
 const { emitSound } = require("./_lib/emit");
 const { showNotification } = require("./_lib/notify");
@@ -13,6 +13,8 @@ let raw = "";
 process.stdin.setEncoding("utf-8");
 process.stdin.on("data", (chunk) => (raw += chunk));
 process.stdin.on("end", () => {
+  if (isDisabled()) process.exit(0);
+
   let input = {};
   try {
     input = JSON.parse(raw);

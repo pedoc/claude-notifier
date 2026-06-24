@@ -152,7 +152,7 @@ Five [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) a
 
 Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCode settings) to determine which sound to play and whether to show notifications.
 
-On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `paplay` (with `aplay` as fallback) for audio and `notify-send` for notifications — install `libnotify` (`notify-send`), a PulseAudio/PipeWire or ALSA stack, and the `sound-theme-freedesktop` package if they aren't already present.
+On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `pw-play` (PipeWire) or `paplay` (PulseAudio) for audio, falling back to `aplay`, and `notify-send` for notifications — install `libnotify` (`notify-send`), a PipeWire (`pipewire-bin` / `pipewire-audio`) or PulseAudio (`pulseaudio-utils`) stack, and the `sound-theme-freedesktop` package if they aren't already present. The sounds are Ogg (`.oga`) files; `aplay` cannot decode them (it plays static), so a PipeWire or PulseAudio player is recommended.
 
 ### Behavior
 
@@ -200,6 +200,18 @@ New-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted"   # mute
 Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 ```
 
+## Disable per session (`CLAUDE_NOTIFIER_DISABLE`)
+
+The mute flag above is machine-wide. To silence the hooks for a **single
+session only** — e.g. when SSHing into a shared host so your sessions don't
+play sounds on someone else's machine — set `CLAUDE_NOTIFIER_DISABLE` in that
+shell. When set (to any value other than empty/`0`/`false`), every hook exits
+without sound, popup, or signal; sessions in other shells are unaffected.
+
+```sh
+export CLAUDE_NOTIFIER_DISABLE=1   # add to your shell rc to make it permanent
+```
+
 ## Platform support
 
 | Platform | VSCode Extension | CLI Install | Hook runner                                               |
@@ -207,7 +219,7 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 | macOS    | Yes              | Yes         | Node.js                                                   |
 | Windows  | Yes              | VSCode only | PowerShell                                                |
 | WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
-| Linux    | Yes              | Yes         | Node.js (uses `paplay`/`aplay` and `notify-send`)         |
+| Linux    | Yes              | Yes         | Node.js (uses `pw-play`/`paplay`/`aplay` and `notify-send`) |
 
 ## Contributing
 

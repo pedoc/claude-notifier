@@ -6,6 +6,18 @@
 
 - **Remote-audio mode — hear notifications when Claude runs on a remote host.** When Claude Code runs over SSH / WSL / in a dev container, notification sounds can now play on your **local** machine instead of the (usually headless) remote — with your normal presets and volume, and no terminal bell. A small dependency-free helper, `cn-daemon` (Go, ~2.4 MB, source in [`daemon/`](daemon/), published per-platform to GitHub Releases by [`daemon-release.yml`](.github/workflows/daemon-release.yml)), runs locally and the remote pushes events to it over an SSH reverse forward. Opt-in via `claudeNotifier.remoteAudio.enabled` (default `false`) — existing local setups are unaffected. Hooks route all sound through a single `hook/_lib/emit.js` chokepoint that pushes when remote-audio is on and plays locally otherwise; the extension pushes the "done" sound the same way, falling back to the terminal bell when off. Setup guide: [docs/REMOTE_HOSTS.md](docs/REMOTE_HOSTS.md). Addresses the long-standing remote-no-sound reports ([#58](https://github.com/ashmitb95/claude-notifier/issues/58), [#3](https://github.com/ashmitb95/claude-notifier/issues/3)).
 
+## [3.4.0] - 2026-06-21
+
+### Added
+
+- **`CLAUDE_NOTIFIER_DISABLE` environment variable** for per-session opt-out. Setting it (to any value other than empty/`0`/`false`) in a shell makes every hook exit silently — no sound, popup, or signal — for sessions in that shell only, leaving other sessions and the machine-wide mute flag untouched. Intended for shared SSH hosts, where the host's hooks otherwise play sounds for every user's sessions. ([#63](https://github.com/ashmitb95/claude-notifier/issues/63))
+
+## [3.3.2] - 2026-06-05
+
+### Fixed
+
+- **Static instead of sound on Linux without PulseAudio.** The Linux audio path tried `paplay` and fell back to `aplay`. The preset sounds are Ogg (`.oga`) files, which `aplay` (a raw ALSA/WAV player) cannot decode — it renders them as static. On modern PipeWire-based distros (e.g. Ubuntu 24.04+) `paplay` isn't installed by default, so playback fell through to `aplay` and produced static in every scenario. The player chain now tries `pw-play` (PipeWire) first, then `paplay` (PulseAudio), then `aplay`, so audio works out of the box on PipeWire systems. This bug had been latent since Linux support was added in 2.4.0 and was exposed by distros moving to PipeWire. ([#49](https://github.com/ashmitb95/claude-notifier/issues/49))
+
 ## [3.3.1] - 2026-06-05
 
 ### Fixed
