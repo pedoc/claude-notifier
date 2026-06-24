@@ -15,6 +15,7 @@ import {
   openSettings,
 } from "./ui/status-bar";
 import { previewEventSoundCommand, pickEventSoundCommand } from "./ui/sound-picker";
+import { setupRemoteAudio } from "./notifications/remote-setup";
 import { cleanupStaleMarkers } from "./signals/task-timer";
 import { initLogger, log } from "./log";
 
@@ -53,6 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("claudeNotifier.setVolume", (v: number) => setVolume(v)),
     vscode.commands.registerCommand("claudeNotifier.setThreshold", () => setThreshold()),
     vscode.commands.registerCommand("claudeNotifier.openSettings", () => openSettings()),
+    vscode.commands.registerCommand("claudeNotifier.setupRemoteAudio", () => setupRemoteAudio()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("claudeNotifier")) {
         syncConfig();

@@ -48,6 +48,10 @@
       {
         "command": "claudeNotifier.openSettings",
         "title": "Claude Notifier: Open Settings"
+      },
+      {
+        "command": "claudeNotifier.setupRemoteAudio",
+        "title": "Claude Notifier: Set up remote audio (play sounds locally over SSH)…"
       }
     ],
     "configuration": {

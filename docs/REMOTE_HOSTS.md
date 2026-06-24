@@ -21,6 +21,12 @@ forward**. No audio on the remote, no terminal bell, full sound customization.
 
 ## Setup
 
+> **Shortcut (VS Code):** run **`Claude Notifier: Set up remote audio…`** from the
+> Command Palette on the remote window. It enables the setting (step 4), opens the
+> releases page in your local browser (step 1), and shows the `RemoteForward` line
+> (step 3). You still run the daemon and edit `~/.ssh/config` locally — those can't
+> be done from the remote side.
+
 ### 1. Install `cn-daemon` on your local machine
 
 Download the binary for your platform from the
