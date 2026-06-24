@@ -36,4 +36,3 @@ Open `View → Output → Claude Notifier`, paste the relevant lines:
 **Already tried**
 - [ ] Reloaded the VS Code window
 - [ ] Reset the sound preset to a default
-- [ ] Walked the `/test-notifier` Diagnostics fault tree

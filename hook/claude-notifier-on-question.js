@@ -2,8 +2,8 @@
 // Claude Notifier — PreToolUse hook for AskUserQuestion
 // Plays a sound + shows a notification when Claude asks the user a question.
 const { isMuted, isDisabled, readConfig } = require("./_lib/config");
-const { resolveSound, BUNDLED_FALLBACK } = require("./_lib/sounds");
-const { playSound } = require("./_lib/play");
+const { BUNDLED_FALLBACK } = require("./_lib/sounds");
+const { emitSound } = require("./_lib/emit");
 const { showNotification } = require("./_lib/notify");
 const { writeSignal } = require("./_lib/signal");
 const { buildClickAction, GENERIC_ACTIVATE } = require("./_lib/click");
@@ -47,12 +47,17 @@ process.stdin.on("end", () => {
   }
 
   if (level === "sound+popup" || level === "sound") {
-    const sound = resolveSound(
+    emitSound(
+      "question",
       cfg.sound,
-      "/System/Library/Sounds/Funk.aiff",
-      "C:\\Windows\\Media\\Windows Notify.wav"
+      {
+        mac: "/System/Library/Sounds/Funk.aiff",
+        win: "C:\\Windows\\Media\\Windows Notify.wav",
+        fallback: BUNDLED_FALLBACK.asksQuestion,
+      },
+      volume,
+      config
     );
-    playSound(sound, BUNDLED_FALLBACK.asksQuestion, volume);
   }
 
   if (level === "sound+popup" || level === "popup") {

@@ -5,8 +5,8 @@
 // Mirrors the Stop hook's split: when a VS Code window owns the cwd, the
 // extension handles the sound + popup; otherwise the hook plays directly.
 const { isMuted, isDisabled, readConfig } = require("./_lib/config");
-const { resolveSound, BUNDLED_FALLBACK } = require("./_lib/sounds");
-const { playSound } = require("./_lib/play");
+const { BUNDLED_FALLBACK } = require("./_lib/sounds");
+const { emitSound } = require("./_lib/emit");
 const { showNotification } = require("./_lib/notify");
 const { extensionOwnsCwd } = require("./_lib/active");
 const { writeSignal } = require("./_lib/signal");
@@ -46,14 +46,19 @@ process.stdin.on("end", () => {
   if (shouldSuppressForThreshold(input.session_id, threshold)) process.exit(0);
 
   if (level === "sound+popup" || level === "sound") {
-    const sound = resolveSound(
-      cfg.sound,
-      "/System/Library/Sounds/Pop.aiff",
-      "C:\\Windows\\Media\\notify.wav"
-    );
     // No dedicated subagent fallback bundled; the taskCompleted fallback is
     // the closest semantic match.
-    playSound(sound, BUNDLED_FALLBACK.taskCompleted, volume);
+    emitSound(
+      "subagent_done",
+      cfg.sound,
+      {
+        mac: "/System/Library/Sounds/Pop.aiff",
+        win: "C:\\Windows\\Media\\notify.wav",
+        fallback: BUNDLED_FALLBACK.taskCompleted,
+      },
+      volume,
+      config
+    );
   }
 
   if (level === "sound+popup" || level === "popup") {

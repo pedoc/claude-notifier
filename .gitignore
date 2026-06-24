@@ -3,3 +3,10 @@ out/
 coverage/
 *.vsix
 *.tsbuildinfo
+
+# Go daemon build artifacts (binaries are published via CI to GitHub Releases)
+daemon/dist/
+
+# Throwaway remote-audio spike scaffolding (never committed)
+spike/
+daemon/*.log
