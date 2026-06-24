@@ -6,17 +6,15 @@ Plays a sound and shows a notification when [Claude Code](https://claude.com/cla
 
 Stop watching the screen — go grab a coffee and let Claude ping you when it needs you.
 
-Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, **WSL**, and **Linux**.
+Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, **WSL**, and **Linux**, including **remote hosts over SSH**.
 
-## What's new — 3.3.0
+## What's new — 3.5.0
 
 ![Hover the Claude entry in the status bar to open the control panel](media/popup-screen.png)
 
-- **Status-bar control panel.** Hover the **Claude** entry in the status bar to open a panel with volume buttons, per-event sound preview and preset swap, and minimum-task-duration threshold control.
-- **Minimum task duration threshold.** Set `claudeNotifier.minTaskDurationThreshold` (seconds) to suppress notifications for tasks shorter than the threshold — counted from the moment you submit the prompt. Quiet for the quick stuff, alert for the long stuff.
-- **Sound preview on highlight.** Arrow through sound presets in the picker and audition each one at your configured volume before committing.
-- **Parallel-session safe.** Multiple Claude sessions across terminals or VSCode windows each track their own threshold independently.
-- **Subagent silence by default.** Permission and question prompts that originate from a `Task` subagent are suppressed (no sound, no popup) — toggle with `claudeNotifier.suppressSubagentInteractions`. Subagent completions get their own `SubagentStop` hook (`claudeNotifier.subagentCompleted.level`, default off).
+- **Remote audio.** When Claude runs on a remote host (SSH, WSL, dev container), notification sounds now play on your **local** machine instead of the headless remote — see [Remote hosts](#remote-hosts-ssh-wsl-dev-containers).
+- **Per-session disable.** Set `CLAUDE_NOTIFIER_DISABLE` to silence the notifier for a single shell/session — handy on shared SSH hosts (see [below](#disable-per-session-claude_notifier_disable)).
+- **Status-bar control panel.** Hover the **Claude** entry in the status bar for volume, per-event sound preview/swap, and the minimum-task-duration threshold.
 
 ## Install
 
@@ -64,56 +62,17 @@ curl -fsSL https://raw.githubusercontent.com/ashmitb95/claude-notifier/main/unin
 
 **Windows:** install the VSCode extension. It auto-configures the PowerShell hooks; no separate CLI installer is needed.
 
-## Settings
+## Remote hosts (SSH, WSL, dev containers)
 
-Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`), or add to your `settings.json`:
+When Claude runs on a **remote host**, notification sounds can play on your **local** machine instead of the (usually headless) remote — with your normal sound presets and volume, no terminal bell. A small `cn-daemon` helper runs locally, and the remote pushes events to it over an SSH reverse forward.
 
-```jsonc
-{
-  // Per-event notification level: "sound+popup" | "sound" | "popup" | "off"
-  "claudeNotifier.taskCompleted.level": "sound+popup",
-  "claudeNotifier.needsPermission.level": "sound+popup",
-  "claudeNotifier.asksQuestion.level": "sound+popup",
+This is **opt-in**; existing local setups are unaffected. See **[docs/REMOTE_HOSTS.md](docs/REMOTE_HOSTS.md)** for the one-time setup (install the daemon, add a `RemoteForward` line, enable `claudeNotifier.remoteAudio`), or run **`Claude Notifier: Set up remote audio…`** from the Command Palette to walk through it.
 
-  // Per-event sound preset (see list below)
-  "claudeNotifier.taskCompleted.sound": "Hero",
-  "claudeNotifier.needsPermission.sound": "Glass",
-  "claudeNotifier.asksQuestion.sound": "Funk"
-}
-```
+## Configurable Settings
 
-**Notification levels:**
+Open **Settings** → search **"Claude Notifier"** (`Cmd+,` / `Ctrl+,`) to set each event's notification level (`sound+popup` | `sound` | `popup` | `off`) and sound preset.
 
-| Level         | Sound | OS notification | VSCode toast |
-| ------------- | ----- | --------------- | ------------ |
-| `sound+popup` | Yes   | Yes             | Yes          |
-| `sound`       | Yes   | No              | No           |
-| `popup`       | No    | Yes             | Yes          |
-| `off`         | No    | No              | No           |
-
-**Sound presets:**
-- macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
-- Windows: Windows Notify, tada, chimes, chord, ding, notify, ringin, Windows Background
-- Linux: same names as macOS — each is mapped to a freedesktop XDG sound under `/usr/share/sounds/freedesktop/stereo/`
-
-The global **mute toggle** is triggered by clicking the **Claude** entry in the status bar (the hover panel is for other actions); it's also exposed as `Claude Notifier: Toggle Sound` in the command palette. Mute overrides all per-event settings.
-
-### Status-bar control panel
-
-Hover the **Claude** entry in the status bar to open the control panel (see screenshot at the top). It's anchored above the icon and sticky — move into it to click. Available actions:
-
-- Set volume to 0 / 25 / 50 / 75 / 100 / 150 / 200%.
-- Set the minimum task duration threshold (see below).
-- Preview each event's current sound at the configured volume.
-- Change each event's sound preset with arrow-key audition (preview-on-highlight).
-- Open the full settings page.
-
-**Click** the status-bar item to toggle mute (hover opens the panel for every other action).
-
-The picker and preview are also exposed as command-palette entries:
-
-- `Claude Notifier: Choose Sound…`
-- `Claude Notifier: Preview Sound…`
+**Sound presets** — macOS: Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink. Windows: Windows Notify, tada, chimes, chord, ding, notify, ringin, Windows Background. On Linux the macOS names map to freedesktop XDG sounds under `/usr/share/sounds/freedesktop/stereo/`.
 
 ### Minimum task duration threshold
 
@@ -140,22 +99,6 @@ A dedicated `SubagentStop` hook fires when a `Task` subagent finishes. The level
 
 ## How it works
 
-Five [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) are registered:
-
-| Hook                           | Trigger                                                                |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| `Stop`                         | Claude finishes responding                                             |
-| `PermissionRequest`            | Claude needs tool approval                                             |
-| `PreToolUse` (AskUserQuestion) | Claude asks a question                                                 |
-| `UserPromptSubmit`             | You submit a prompt (coordination-only — no sound, no popup)           |
-| `SubagentStop`                 | A `Task` subagent finishes (off by default; opt in to get notified)    |
-
-Each hook reads `~/.claude/hooks/claude-notifier-config.json` (synced from VSCode settings) to determine which sound to play and whether to show notifications.
-
-On **macOS**, hooks use `afplay` and `osascript`. On **Windows** and **WSL**, hooks use PowerShell with `NotifyIcon` balloon tips and system sounds. On **Linux**, hooks use `pw-play` (PipeWire) or `paplay` (PulseAudio) for audio, falling back to `aplay`, and `notify-send` for notifications — install `libnotify` (`notify-send`), a PipeWire (`pipewire-bin` / `pipewire-audio`) or PulseAudio (`pulseaudio-utils`) stack, and the `sound-theme-freedesktop` package if they aren't already present. The sounds are Ogg (`.oga`) files; `aplay` cannot decode them (it plays static), so a PipeWire or PulseAudio player is recommended.
-
-### Behavior
-
 - **Per-session dedup.** Rapid back-to-back events within a single Claude session coalesce automatically — one notification per stage, not a flood. A stage advances when you send your next prompt or after ~30 minutes of idle time.
 - **Bundled fallback sounds.** If the configured system sound file is missing on disk, a bundled WAV plays so you still hear something.
 - **Defers to other notification hosts.** Inside VS Code, the extension takes over from the hook fallback for the owning window. Inside [cmux](https://github.com/manaflow-ai/cmux), the hook detects cmux's `CMUX_CLAUDE_HOOK_CMUX_BIN` env var and skips its own sound + popup so cmux's native banner doesn't get double-stacked.
@@ -172,17 +115,6 @@ brew install terminal-notifier
 Or use the bundled command — open the Command Palette and run **"Claude Notifier: Install terminal-notifier (clickable macOS notifications)"**. It runs the `brew install` in an interactive VS Code terminal so you can see what's happening. Reload the window after install to enable it.
 
 When `terminal-notifier` is present, the extension uses it automatically. When it's not, the extension falls back to the standard `osascript` notification (everything still works — clicks just open Script Editor).
-
-### Remote hosts (SSH, WSL, dev containers)
-
-When Claude runs on a **remote host**, notification sounds can now play on your
-**local** machine instead of the (usually headless) remote — with your normal
-sound presets and volume, no terminal bell. A small `cn-daemon` helper runs
-locally and the remote pushes events to it over an SSH reverse forward.
-
-This is **opt-in**: existing local setups are unaffected. See
-**[docs/REMOTE_HOSTS.md](docs/REMOTE_HOSTS.md)** for the one-time setup (install
-the daemon, add a `RemoteForward` line, enable `claudeNotifier.remoteAudio`).
 
 ## Mute/unmute (CLI)
 
@@ -202,11 +134,7 @@ Remove-Item "$env:USERPROFILE\.claude\hooks\claude-notifier-muted" # unmute
 
 ## Disable per session (`CLAUDE_NOTIFIER_DISABLE`)
 
-The mute flag above is machine-wide. To silence the hooks for a **single
-session only** — e.g. when SSHing into a shared host so your sessions don't
-play sounds on someone else's machine — set `CLAUDE_NOTIFIER_DISABLE` in that
-shell. When set (to any value other than empty/`0`/`false`), every hook exits
-without sound, popup, or signal; sessions in other shells are unaffected.
+The mute flag above is machine-wide. To silence the hooks for a **single session only** — e.g. when SSHing into a shared host so your sessions don't play sounds on someone else's machine — set `CLAUDE_NOTIFIER_DISABLE` in that shell. When set (to any value other than empty/`0`/`false`), every hook exits without sound, popup, or signal; sessions in other shells are unaffected.
 
 ```sh
 export CLAUDE_NOTIFIER_DISABLE=1   # add to your shell rc to make it permanent
@@ -214,11 +142,11 @@ export CLAUDE_NOTIFIER_DISABLE=1   # add to your shell rc to make it permanent
 
 ## Platform support
 
-| Platform | VSCode Extension | CLI Install | Hook runner                                               |
-| -------- | ---------------- | ----------- | --------------------------------------------------------- |
-| macOS    | Yes              | Yes         | Node.js                                                   |
-| Windows  | Yes              | VSCode only | PowerShell                                                |
-| WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications) |
+| Platform | VSCode Extension | CLI Install | Hook runner                                                 |
+| -------- | ---------------- | ----------- | ----------------------------------------------------------- |
+| macOS    | Yes              | Yes         | Node.js                                                     |
+| Windows  | Yes              | VSCode only | PowerShell                                                  |
+| WSL      | Yes              | Yes         | Node.js (calls `powershell.exe` for sounds/notifications)   |
 | Linux    | Yes              | Yes         | Node.js (uses `pw-play`/`paplay`/`aplay` and `notify-send`) |
 
 ## Contributing
