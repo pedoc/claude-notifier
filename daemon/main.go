@@ -27,7 +27,10 @@ import (
 	"unicode/utf16"
 )
 
-const debounceMS = 300
+const (
+	debounceMS = 300
+	version    = "3.5.1"
+)
 
 var macSounds = map[string]string{
 	"Basso": "/System/Library/Sounds/Basso.aiff", "Blow": "/System/Library/Sounds/Blow.aiff",
@@ -77,35 +80,44 @@ func clampVolume(v float64) float64 {
 func play(sound string, volume float64) {
 	v := clampVolume(volume)
 	var cmd *exec.Cmd
+	var resolvedPath string
 	switch runtime.GOOS {
 	case "windows":
-		path := winSounds[sound]
-		if path == "" {
-			path = defaultWin
+		resolvedPath = winSounds[sound]
+		if resolvedPath == "" {
+			logf("sound %q not found in windows table, falling back to default", sound)
+			resolvedPath = defaultWin
 		}
-		ps := fmt.Sprintf(`$s='%s'; if(Test-Path $s){(New-Object Media.SoundPlayer $s).PlaySync()}else{[console]::Beep(800,300)}`, path)
+		ps := fmt.Sprintf(`$s='%s'; if(Test-Path $s){(New-Object Media.SoundPlayer $s).PlaySync()}else{[console]::Beep(800,300)}`, resolvedPath)
 		cmd = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePS(ps))
 	case "linux":
-		path := linuxSounds[sound]
-		if path == "" {
-			path = linuxSoundsDir + "/complete.oga"
+		resolvedPath = linuxSounds[sound]
+		if resolvedPath == "" {
+			logf("sound %q not found in linux table, falling back to default", sound)
+			resolvedPath = linuxSoundsDir + "/complete.oga"
 		}
 		paVol := int(math.Round(v * 65536))
 		shell := fmt.Sprintf(`pw-play --volume=%s "%s" 2>/dev/null || paplay --volume=%d "%s" 2>/dev/null || aplay "%s" 2>/dev/null`,
-			strconv.FormatFloat(v, 'f', -1, 64), path, paVol, path, path)
+			strconv.FormatFloat(v, 'f', -1, 64), resolvedPath, paVol, resolvedPath, resolvedPath)
 		cmd = exec.Command("sh", "-c", shell)
 	default: // darwin
-		path := macSounds[sound]
-		if path == "" {
-			path = defaultMac
+		resolvedPath = macSounds[sound]
+		if resolvedPath == "" {
+			logf("sound %q not found in mac table, falling back to default", sound)
+			resolvedPath = defaultMac
 		}
-		cmd = exec.Command("afplay", "-v", strconv.FormatFloat(v, 'f', -1, 64), path)
+		cmd = exec.Command("afplay", "-v", strconv.FormatFloat(v, 'f', -1, 64), resolvedPath)
 	}
+	logf("running: %s (file=%s)", cmd.String(), resolvedPath)
 	if err := cmd.Start(); err != nil {
-		logf("play failed: %v", err)
+		logf("play start failed: %v (cmd=%s)", err, cmd.String())
 		return
 	}
-	go cmd.Wait() // reap without blocking
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			logf("play command exited with error: %v (cmd=%s)", err, cmd.String())
+		}
+	}()
 }
 
 // encodePS encodes a PowerShell script as UTF-16LE base64 for -EncodedCommand.
@@ -140,8 +152,15 @@ func logf(format string, a ...any) {
 
 // handleConn reads newline-delimited JSON events from one pushed connection.
 func handleConn(conn net.Conn) {
-	defer conn.Close()
+	remote := conn.RemoteAddr().String()
+	logf("connection accepted from %s", remote)
+	defer func() {
+		conn.Close()
+		logf("connection closed from %s", remote)
+	}()
+
 	scanner := bufio.NewScanner(conn)
+	var eventCount int
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -149,23 +168,37 @@ func handleConn(conn net.Conn) {
 		}
 		var ev event
 		if err := json.Unmarshal([]byte(line), &ev); err != nil {
-			logf("bad event: %s", line)
+			logf("bad event from %s: %s (err=%v)", remote, line, err)
 			continue
 		}
 		handleEvent(ev)
+		eventCount++
 	}
+	if err := scanner.Err(); err != nil {
+		logf("connection read error from %s after %d events: %v", remote, eventCount, err)
+	}
+	logf("connection from %s finished (%d events)", remote, eventCount)
 }
 
 func main() {
 	host := os.Getenv("CN_HOST")
+	hostSrc := "default"
 	if host == "" {
 		host = "127.0.0.1"
+	} else {
+		hostSrc = "env"
 	}
 	port := os.Getenv("CN_PORT")
+	portSrc := "default"
 	if port == "" {
 		port = "47291"
+	} else {
+		portSrc = "env"
 	}
 	addr := host + ":" + port
+
+	logf("starting v%s (platform=%s go=%s)", version, runtime.GOOS, runtime.Version())
+	logf("bind address: %s (host=%s:%s port=%s:%s)", addr, hostSrc, host, portSrc, port)
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -174,7 +207,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "cn-daemon: cannot listen on %s: %v\n", addr, err)
 		os.Exit(1)
 	}
-	logf("listening on %s (platform=%s)", addr, runtime.GOOS)
+	logf("listening on %s", addr)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

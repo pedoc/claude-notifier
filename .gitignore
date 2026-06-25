@@ -10,3 +10,4 @@ daemon/dist/
 # Throwaway remote-audio spike scaffolding (never committed)
 spike/
 daemon/*.log
+daemon/cn-daemon.exe
