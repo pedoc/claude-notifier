@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.2] - 2026-07-04
+
+### Fixed
+
+- **Signal routing failed on Windows when workspace paths differed only in case.** Path matching compared strings case-sensitively, so a `cwd` like `f:\Github\proj` would not match a workspace folder recorded as `F:\Github\proj`, and the notification was routed away. Paths are now normalized to lowercase on Windows before comparison, in all three path-matching functions (`cwdMatchesFolder` in the extension, plus the PowerShell and JS hook equivalents). Contributed by [@zwye](https://github.com/zwye). ([#75](https://github.com/ashmitb95/claude-notifier/pull/75))
+- **Log timestamps showed UTC instead of local time.** The output-channel logger used `Date.toISOString()`, so timestamps were off by the user's UTC offset (e.g. 8 hours behind for UTC+8). They now render in the local timezone. Contributed by [@zwye](https://github.com/zwye). ([#72](https://github.com/ashmitb95/claude-notifier/pull/72))
+
 ## [3.5.0] - 2026-06-24
 
 ### Added
