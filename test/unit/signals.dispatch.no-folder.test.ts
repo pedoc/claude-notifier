@@ -3,19 +3,21 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
+// A window with NO workspace folder open. It should act as a fallback owner:
+// handle a cwd signal only when no other live window owns that cwd.
 let tmpRoot: string;
-let tmpHooksDir: string;
 let signalFile: string;
 let configFile: string;
 let playLocalCalls: number;
 let popupCalls: number;
-// Mutable mock state, read live by the vscode mock below.
-let mockFocused: boolean;
+// Mutable mock state read live by the mocks below.
+let mockAnotherOwns: boolean;
 let mockAutoMute: boolean;
+let mockFocused: boolean;
 
 vi.mock("vscode", () => ({
   workspace: {
-    workspaceFolders: [{ uri: { fsPath: "/x" } }],
+    workspaceFolders: [],
     onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
     getConfiguration: () => ({
       get: (key: string) => (key === "autoMuteWhenFocused" ? mockAutoMute : undefined),
@@ -50,9 +52,10 @@ vi.mock("../../src/notifications/local", () => ({
 }));
 
 vi.mock("../../src/routing/cwd", () => ({
-  getOwnWorkspaceFolders: () => ["/x"],
+  // No workspace folders → this window is a folderless "loose tab".
+  getOwnWorkspaceFolders: () => [],
   cwdMatchesFolder: (a: string, b: string) => a.startsWith(b),
-  anotherWindowOwnsCwd: () => false,
+  anotherWindowOwnsCwd: () => mockAnotherOwns,
 }));
 
 vi.mock("../../src/routing/focus", () => ({
@@ -63,17 +66,18 @@ vi.mock("../../src/routing/focus", () => ({
 }));
 
 beforeEach(() => {
-  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dispatch-focus-test-"));
-  tmpHooksDir = path.join(tmpRoot, ".claude", "hooks");
-  signalFile = path.join(tmpHooksDir, "claude-signal");
-  configFile = path.join(tmpHooksDir, "claude-notifier-config.json");
-  fs.mkdirSync(tmpHooksDir, { recursive: true });
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dispatch-no-folder-test-"));
+  const hooksDir = path.join(tmpRoot, ".claude", "hooks");
+  signalFile = path.join(hooksDir, "claude-signal");
+  configFile = path.join(hooksDir, "claude-notifier-config.json");
+  fs.mkdirSync(hooksDir, { recursive: true });
   process.env.HOME = tmpRoot;
   process.env.USERPROFILE = tmpRoot;
   playLocalCalls = 0;
   popupCalls = 0;
-  mockFocused = false;
+  mockAnotherOwns = false;
   mockAutoMute = false;
+  mockFocused = false;
   fs.writeFileSync(
     configFile,
     JSON.stringify({
@@ -92,12 +96,27 @@ afterEach(() => {
 async function fireDone(): Promise<void> {
   vi.resetModules();
   const dispatch = await import("../../src/signals/dispatch");
-  fs.writeFileSync(signalFile, `done ${Date.now()} sess-1 /x`);
+  fs.writeFileSync(signalFile, `done ${Date.now()} sess-1 /some/project`);
   (dispatch as unknown as { __handleSignalForTest: () => void }).__handleSignalForTest();
 }
 
-describe("dispatch — auto-mute when focused", () => {
-  it("suppresses sound + popup when enabled AND focused", async () => {
+describe("dispatch — no-folder window routing", () => {
+  it("does NOT handle a done another window already owns (stray-tab bug)", async () => {
+    mockAnotherOwns = true;
+    await fireDone();
+    expect(playLocalCalls).toBe(0);
+    expect(popupCalls).toBe(0);
+  });
+
+  it("handles a done nobody else owns (a Claude session inside this window)", async () => {
+    mockAnotherOwns = false;
+    await fireDone();
+    expect(playLocalCalls).toBe(1);
+    expect(popupCalls).toBe(1);
+  });
+
+  it("applies normal focus rules to its own session: suppressed when focused", async () => {
+    mockAnotherOwns = false;
     mockAutoMute = true;
     mockFocused = true;
     await fireDone();
@@ -105,24 +124,9 @@ describe("dispatch — auto-mute when focused", () => {
     expect(popupCalls).toBe(0);
   });
 
-  it("fires when enabled but NOT focused (background window still notifies)", async () => {
+  it("applies normal focus rules to its own session: fires when not focused", async () => {
+    mockAnotherOwns = false;
     mockAutoMute = true;
-    mockFocused = false;
-    await fireDone();
-    expect(playLocalCalls).toBe(1);
-    expect(popupCalls).toBe(1);
-  });
-
-  it("fires when focused but the setting is disabled", async () => {
-    mockAutoMute = false;
-    mockFocused = true;
-    await fireDone();
-    expect(playLocalCalls).toBe(1);
-    expect(popupCalls).toBe(1);
-  });
-
-  it("fires when disabled and unfocused (default behavior)", async () => {
-    mockAutoMute = false;
     mockFocused = false;
     await fireDone();
     expect(playLocalCalls).toBe(1);

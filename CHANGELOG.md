@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **A VS Code window with no folder open fired a notification for every task.** Such a "loose tab" wrote an empty routing marker, which made it claim and handle `done` signals from _every_ project — a long-standing duplicate notification that auto-mute-when-focused made obvious (the stray window is never the focused one, so it always fired). A folderless window now acts only as a fallback: it handles a `done` signal only when no other live window owns that cwd, so it no longer fires for other windows' work, while a Claude session running _inside_ it still notifies under the normal focus rules.
+
 - **Spurious notifications inside Cursor.** Cursor executes `~/.claude/settings.json` hooks from its own Composer agent, so finishing a turn in Cursor fired the notifier's sound + popup even though no Claude Code session was involved. The hooks now detect Cursor (its `CURSOR_*` environment, plus its bundle id on macOS) and exit at the top — no sound, no popup, and no signal. Suppressing the signal is what also silences the VS Code extension: the extension reads the signal file and can't detect Cursor on its own, so a Cursor turn on a project also open in VS Code was still firing a notification until the hook stopped writing the signal. Terminal and remote Claude Code sessions still notify normally. ([#74](https://github.com/ashmitb95/claude-notifier/issues/74))
 
 ### Added

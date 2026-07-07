@@ -36,6 +36,44 @@ export function cwdMatchesFolder(cwd: string, folder: string): boolean {
   return normCwd.startsWith(normFolder.endsWith(path.sep) ? normFolder : normFolder + path.sep);
 }
 
+/**
+ * True when a *different* live window has a workspace folder that contains
+ * `cwd`. Reads the same per-window active markers the hooks use, skipping this
+ * window's own marker and dead pids. Empty markers (windows with no folder
+ * open) contribute no folders, so they never count as owners.
+ *
+ * Used by a no-folder window to decide whether to act as the fallback handler
+ * for a signal: it should stay out of the way when some folder window already
+ * owns the cwd, but still handle a cwd that nobody else owns (e.g. a Claude
+ * session running inside that folderless window).
+ */
+export function anotherWindowOwnsCwd(cwd: string): boolean {
+  if (!cwd) return false;
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(ACTIVE_DIR);
+  } catch {
+    return false;
+  }
+  for (const name of entries) {
+    const markerPath = path.join(ACTIVE_DIR, name);
+    if (markerPath === OWN_PID_FILE) continue; // skip our own marker
+    const pid = parseInt(name, 10);
+    if (!Number.isFinite(pid) || !isPidAlive(pid)) continue;
+    let folders = "";
+    try {
+      folders = fs.readFileSync(markerPath, "utf-8");
+    } catch {}
+    for (const folder of folders
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      if (cwdMatchesFolder(cwd, folder)) return true;
+    }
+  }
+  return false;
+}
+
 export function cleanStalePidFiles(): void {
   try {
     for (const name of fs.readdirSync(ACTIVE_DIR)) {

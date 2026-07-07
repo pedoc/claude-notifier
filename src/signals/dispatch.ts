@@ -5,7 +5,7 @@ import { LEVELS } from "./types";
 import { parseSignal } from "./parser";
 import * as stage from "./stage";
 import { log } from "../log";
-import { getOwnWorkspaceFolders, cwdMatchesFolder } from "../routing/cwd";
+import { getOwnWorkspaceFolders, cwdMatchesFolder, anotherWindowOwnsCwd } from "../routing/cwd";
 import { rememberDone, getRememberedDone, revealClaudeTab } from "../routing/focus";
 import {
   getEventLevel,
@@ -67,11 +67,18 @@ function handleSignal(): void {
     return;
   }
 
-  // Each window only handles signals fired from inside its own workspace.
-  // Signals without a cwd (older hook scripts, prompt hook) fall through.
+  // Route by workspace. A window with folders open handles only signals fired
+  // from inside its own workspace. A window with NO folder open (e.g. a loose
+  // tab) acts as a fallback owner: it handles a cwd signal only when no other
+  // live window already owns that cwd — so a stray tab never fires for another
+  // window's project, but a Claude session running inside the folderless window
+  // still notifies (and then the normal focus rules apply). Signals without a
+  // cwd (older hook scripts, prompt hook) fall through.
   if (cwd) {
     const folders = getOwnWorkspaceFolders();
-    if (folders.length > 0 && !folders.some((f) => cwdMatchesFolder(cwd, f))) {
+    if (folders.length > 0) {
+      if (!folders.some((f) => cwdMatchesFolder(cwd, f))) return;
+    } else if (anotherWindowOwnsCwd(cwd)) {
       return;
     }
   }
