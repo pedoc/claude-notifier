@@ -85,6 +85,14 @@ function refresh(): void {
     muted: !soundEnabled,
     volume: cfg.get<number>("soundVolume", 1),
     threshold: cfg.get<number>("minTaskDurationThreshold", 0),
+    autoMuteWhenFocused: cfg.get<boolean>("autoMuteWhenFocused", false),
     events,
   });
+}
+
+export async function toggleAutoMuteWhenFocused(): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration("claudeNotifier");
+  const current = cfg.get<boolean>("autoMuteWhenFocused", false);
+  await cfg.update("autoMuteWhenFocused", !current, vscode.ConfigurationTarget.Global);
+  // The onDidChangeConfiguration listener in createStatusBar refreshes the panel.
 }

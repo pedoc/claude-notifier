@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Auto-mute when focused.** New opt-in setting `claudeNotifier.autoMuteWhenFocused` (default `false`) suppresses the task-completed sound and all popups while the VS Code window running the task is focused — if you're already looking at the window, the notification is redundant. Suppression is scoped **per-window**: a task finishing in a background window still notifies, so multi-window / tabbed setups are never silenced (the global mute flag is untouched). Permission and question sounds still play. Toggle it from the status-bar hover panel or the new **Claude Notifier: Toggle Auto-mute When Focused** command. ([#71](https://github.com/ashmitb95/claude-notifier/issues/71))
+
 ## [3.5.2] - 2026-07-04
 
 ### Fixed

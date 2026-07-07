@@ -19,6 +19,7 @@ const baseState: PanelState = {
   muted: false,
   volume: 1,
   threshold: 0,
+  autoMuteWhenFocused: false,
   events: [
     { key: "taskCompleted", label: "Task completed", sound: "Hero" },
     { key: "needsPermission", label: "Permission", sound: "Glass" },
@@ -86,6 +87,22 @@ describe("buildPanelMarkdown", () => {
   it("includes the setThreshold command", () => {
     const md = buildPanelMarkdown(baseState).value;
     expect(md).toContain("command:claudeNotifier.setThreshold");
+  });
+
+  it("includes the auto-mute-when-focused toggle command", () => {
+    const md = buildPanelMarkdown(baseState).value;
+    expect(md).toContain("command:claudeNotifier.toggleAutoMuteWhenFocused");
+  });
+
+  it("shows auto-mute as Off with no check when disabled", () => {
+    const md = buildPanelMarkdown({ ...baseState, autoMuteWhenFocused: false }).value;
+    expect(md).toMatch(/Auto-mute when focused[^\n]*Off/);
+    expect(md).not.toMatch(/Auto-mute when focused[^\n]*\$\(check\)/);
+  });
+
+  it("shows auto-mute with a check when enabled", () => {
+    const md = buildPanelMarkdown({ ...baseState, autoMuteWhenFocused: true }).value;
+    expect(md).toMatch(/Auto-mute when focused[^\n]*\$\(check\)[^\n]*On/);
   });
 
   it("does not duplicate the mute toggle in the panel body", () => {

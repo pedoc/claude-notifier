@@ -68,6 +68,12 @@ When `> 0`, notification sounds and popups are suppressed for any task that comp
 
 Useful when you're actively watching the IDE and don't need audio for sub-second roundtrips — set it to e.g. `10` and you'll only hear audio for longer-running work. Per-session marker files keep parallel Claude sessions (multiple terminals or VS Code windows) independent — each session times its own threshold.
 
+### Auto-mute when focused
+
+`claudeNotifier.autoMuteWhenFocused` *(boolean, default `false`)*
+
+When on, the task-completed sound and all popups are suppressed while the VS Code window running the task is focused — if you're already looking at it, the notification is redundant. It's scoped per-window: a task finishing in a **background** window still notifies, so multi-window setups aren't silenced. Permission and question sounds still play. Toggle it quickly from the status-bar panel (hover the **Claude** item) or the **Claude Notifier: Toggle Auto-mute When Focused** command.
+
 ### Subagent handling
 
 Claude Code emits an `agent_id` field on every hook payload that fires from inside a `Task` subagent. Two settings use this:

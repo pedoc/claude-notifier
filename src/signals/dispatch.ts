@@ -13,6 +13,7 @@ import {
   getSoundVolume,
   getMinTaskDurationThreshold,
   getRemoteAudio,
+  getAutoMuteWhenFocused,
 } from "../settings/sync";
 import { playLocalSound } from "../notifications/sound";
 import { showLocalNotification } from "../notifications/local";
@@ -123,6 +124,14 @@ function warnDeprecatedSettingOnce(): void {
 }
 
 function showNotification(reason: string, cwd: string): void {
+  // Auto-mute when focused: if the user is looking at this window, the extension
+  // notification is redundant. Suppress the extension-played sound + all popups.
+  // This is per-window-correct because dispatch only reaches here for signals in
+  // this window's own workspace (see handleSignal's cwd filter), so a task in
+  // a background window still notifies. Hook-played permission/question sounds are
+  // out of scope — the hook process can't see window focus.
+  if (getAutoMuteWhenFocused() && vscode.window.state.focused) return;
+
   // Architecture note: "question" and "input" local sounds are played by their
   // respective hook scripts (PreToolUse / PermissionRequest) — not the extension.
   // Only "done" local sounds are played here, because the extension is the
