@@ -2,7 +2,6 @@ const fs = require("fs");
 const { execSync } = require("child_process");
 const { USE_WIN, IS_LINUX, PS_BIN } = require("./platform");
 const { isInsideCmux } = require("./cmux");
-const { isInsideCursor } = require("./cursor");
 
 function clampVolume(v) {
   if (typeof v !== "number" || !Number.isFinite(v)) return 1;
@@ -27,8 +26,6 @@ function playSound(primaryPath, fallbackPath, volume = 1) {
   // cmux posts its own banner for the same event; skip the sound to avoid
   // double-notifying. See _lib/cmux.js.
   if (isInsideCmux()) return;
-  // Cursor runs these hooks from its own agent; defer to Cursor. See _lib/cursor.js.
-  if (isInsideCursor()) return;
   const soundPath =
     primaryPath && fs.existsSync(primaryPath) ? primaryPath : fallbackPath || primaryPath;
   if (!soundPath) return;

@@ -47,12 +47,31 @@ describe("hook/_lib/config — isMuted", () => {
 
 describe("hook/_lib/config — isDisabled", () => {
   const ORIG = process.env.CLAUDE_NOTIFIER_DISABLE;
+  // isDisabled() also returns true under Cursor (via isInsideCursor), so clear
+  // any Cursor signals to isolate the env-var behavior; the suite may itself run
+  // inside Cursor's terminal.
+  const CURSOR_KEYS = Object.keys(process.env).filter((k) => k.startsWith("CURSOR_"));
+  const savedCursor: Record<string, string | undefined> = Object.fromEntries([
+    ...CURSOR_KEYS.map((k) => [k, process.env[k]]),
+    ["__CFBundleIdentifier", process.env.__CFBundleIdentifier],
+  ]);
+  function clearCursor() {
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("CURSOR_")) delete process.env[k];
+    }
+    delete process.env.__CFBundleIdentifier;
+  }
   afterAll(() => {
     if (ORIG === undefined) delete process.env.CLAUDE_NOTIFIER_DISABLE;
     else process.env.CLAUDE_NOTIFIER_DISABLE = ORIG;
+    clearCursor();
+    for (const [k, v] of Object.entries(savedCursor)) {
+      if (v !== undefined) process.env[k] = v;
+    }
   });
   beforeEach(() => {
     delete process.env.CLAUDE_NOTIFIER_DISABLE;
+    clearCursor();
   });
 
   it("false when env var is unset", () => {
@@ -71,6 +90,11 @@ describe("hook/_lib/config — isDisabled", () => {
       process.env.CLAUDE_NOTIFIER_DISABLE = v;
       expect(config.isDisabled()).toBe(true);
     }
+  });
+
+  it("true when running under Cursor even with the env var unset", () => {
+    process.env.CURSOR_VERSION = "3.1.17";
+    expect(config.isDisabled()).toBe(true);
   });
 });
 
