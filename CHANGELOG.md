@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Spurious notifications inside Cursor.** Cursor executes `~/.claude/settings.json` hooks from its own Composer agent, so finishing a turn in Cursor fired the notifier's sound + popup even though no Claude Code session was involved. The hooks now detect Cursor (its `CURSOR_*` environment, plus its bundle id on macOS) and stay silent there — the same "defer to a host with its own UI" rule already applied to cmux. Signal writing is unaffected, and terminal / remote Claude Code sessions still notify normally. ([#74](https://github.com/ashmitb95/claude-notifier/issues/74))
+
 ### Added
 
 - **Auto-mute when focused.** New opt-in setting `claudeNotifier.autoMuteWhenFocused` (default `false`) suppresses the task-completed sound and all popups while the VS Code window running the task is focused — if you're already looking at the window, the notification is redundant. Suppression is scoped **per-window**: a task finishing in a background window still notifies, so multi-window / tabbed setups are never silenced (the global mute flag is untouched). Permission and question sounds still play. Toggle it from the status-bar hover panel or the new **Claude Notifier: Toggle Auto-mute When Focused** command. ([#71](https://github.com/ashmitb95/claude-notifier/issues/71))

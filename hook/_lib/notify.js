@@ -2,6 +2,7 @@ const fs = require("fs");
 const { execSync, execFileSync } = require("child_process");
 const { USE_WIN, IS_LINUX, IS_MAC, PS_BIN } = require("./platform");
 const { isInsideCmux } = require("./cmux");
+const { isInsideCursor } = require("./cursor");
 
 const TITLE = "Claude Notifier";
 
@@ -51,6 +52,8 @@ function showNotification(message, opts = {}) {
   // cmux posts its own banner for the same event; skip the popup to avoid
   // double-notifying. See _lib/cmux.js.
   if (isInsideCmux()) return;
+  // Cursor runs these hooks from its own agent; defer to Cursor. See _lib/cursor.js.
+  if (isInsideCursor()) return;
   const preferTn = !!opts.preferTerminalNotifier;
   const executeCmd = opts.executeCmd;
   try {
