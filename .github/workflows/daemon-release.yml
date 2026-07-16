@@ -19,7 +19,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v5
         with:
@@ -44,7 +44,7 @@ jobs:
           ls -la dist
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: daemon/dist/*
           fail_on_unmatched_files: true

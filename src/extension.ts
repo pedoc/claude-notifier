@@ -13,6 +13,7 @@ import {
   setVolume,
   setThreshold,
   openSettings,
+  toggleAutoMuteWhenFocused,
 } from "./ui/status-bar";
 import { previewEventSoundCommand, pickEventSoundCommand } from "./ui/sound-picker";
 import { setupRemoteAudio } from "./notifications/remote-setup";
@@ -55,6 +56,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("claudeNotifier.setThreshold", () => setThreshold()),
     vscode.commands.registerCommand("claudeNotifier.openSettings", () => openSettings()),
     vscode.commands.registerCommand("claudeNotifier.setupRemoteAudio", () => setupRemoteAudio()),
+    vscode.commands.registerCommand("claudeNotifier.toggleAutoMuteWhenFocused", () =>
+      toggleAutoMuteWhenFocused()
+    ),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("claudeNotifier")) {
         syncConfig();

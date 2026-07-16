@@ -9,10 +9,13 @@ Stop watching the screen — go grab a coffee and let Claude ping you when it ne
 
 Works with **VSCode**, **terminal CLI**, **vim**, or any editor where you use Claude Code — on **macOS**, **Windows**, **WSL**, and **Linux**, including **remote hosts over SSH**.
 
-## What's new — 3.5.0
+## What's new — 3.6.0
 
-![Hover the Claude entry in the status bar to open the control panel](media/popup-screen.png)
+![The status-bar control panel, now with the Auto-mute when focused toggle](media/popup-screen.png)
 
+- **Auto-mute when focused.** Opt-in setting that mutes the completion sound and popups while the VS Code window running the task is focused — you can already see it working, so the ping is redundant. Scoped per-window, so a task finishing in a background window still notifies. Toggle it right from the panel above (details under [Auto-mute when focused](#auto-mute-when-focused)).
+- **No notifications inside Cursor.** Cursor runs the same `~/.claude` hooks from its own Composer agent; the notifier now detects Cursor and stays silent there instead of firing for work that isn't a Claude Code session.
+- **No stray notifications from a folderless window.** A VS Code window with no folder open no longer fires a duplicate notification for every project.
 - **Remote audio.** When Claude runs on a remote host (SSH, WSL, dev container), notification sounds now play on your **local** machine instead of the headless remote — see [Remote hosts](#remote-hosts-ssh-wsl-dev-containers).
 - **Per-session disable.** Set `CLAUDE_NOTIFIER_DISABLE` to silence the notifier for a single shell/session — handy on shared SSH hosts (see [below](#disable-per-session-claude_notifier_disable)).
 - **Status-bar control panel.** Hover the **Claude** entry in the status bar for volume, per-event sound preview/swap, and the minimum-task-duration threshold.
@@ -68,6 +71,12 @@ When `> 0`, notification sounds and popups are suppressed for any task that comp
 
 Useful when you're actively watching the IDE and don't need audio for sub-second roundtrips — set it to e.g. `10` and you'll only hear audio for longer-running work. Per-session marker files keep parallel Claude sessions (multiple terminals or VS Code windows) independent — each session times its own threshold.
 
+### Auto-mute when focused
+
+`claudeNotifier.autoMuteWhenFocused` *(boolean, default `false`)*
+
+When on, the task-completed sound and all popups are suppressed while the VS Code window running the task is focused — if you're already looking at it, the notification is redundant. It's scoped per-window: a task finishing in a **background** window still notifies, so multi-window setups aren't silenced. Permission and question sounds still play. Toggle it quickly from the status-bar panel (hover the **Claude** item) or the **Claude Notifier: Toggle Auto-mute When Focused** command.
+
 ### Subagent handling
 
 Claude Code emits an `agent_id` field on every hook payload that fires from inside a `Task` subagent. Two settings use this:
@@ -87,7 +96,7 @@ A dedicated `SubagentStop` hook fires when a `Task` subagent finishes. The level
 
 - **Per-session dedup.** Rapid back-to-back events within a single Claude session coalesce automatically — one notification per stage, not a flood. A stage advances when you send your next prompt or after ~30 minutes of idle time.
 - **Bundled fallback sounds.** If the configured system sound file is missing on disk, a bundled WAV plays so you still hear something.
-- **Defers to other notification hosts.** Inside VS Code, the extension takes over from the hook fallback for the owning window. Inside [cmux](https://github.com/manaflow-ai/cmux), the hook detects cmux's `CMUX_CLAUDE_HOOK_CMUX_BIN` env var and skips its own sound + popup so cmux's native banner doesn't get double-stacked.
+- **Defers to other notification hosts.** Inside VS Code, the extension takes over from the hook fallback for the owning window. Inside [cmux](https://github.com/manaflow-ai/cmux), the hook detects cmux's `CMUX_CLAUDE_HOOK_CMUX_BIN` env var and skips its own sound + popup so cmux's native banner doesn't get double-stacked. Inside [Cursor](https://cursor.com) — which runs `~/.claude/settings.json` hooks from its own Composer agent — the hook detects Cursor's `CURSOR_*` environment and stays silent, so you don't get a notification for work that isn't a Claude Code session.
 - **Diagnostic log.** `View → Output → Claude Notifier` shows activation, signal receipts, dedup decisions, and configuration warnings — useful when debugging "I didn't get a notification."
 
 ### Clickable macOS notifications (optional)

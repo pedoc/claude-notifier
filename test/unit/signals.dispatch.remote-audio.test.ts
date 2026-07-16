@@ -40,6 +40,7 @@ vi.mock("../../src/notifications/local", () => ({ showLocalNotification: () => {
 vi.mock("../../src/routing/cwd", () => ({
   getOwnWorkspaceFolders: () => ["/x"],
   cwdMatchesFolder: (a: string, b: string) => a.startsWith(b),
+  anotherWindowOwnsCwd: () => false,
 }));
 vi.mock("../../src/routing/focus", () => ({
   rememberDone: () => {},

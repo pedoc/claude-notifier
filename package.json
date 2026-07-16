@@ -2,7 +2,7 @@
   "name": "claude-notifier",
   "displayName": "Claude Notifier",
   "description": "Plays distinct sounds when Claude Code finishes a task or needs your input",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "icon": "media/icon.png",
   "publisher": "SingularityInc",
   "repository": {
@@ -55,6 +55,10 @@
       {
         "command": "claudeNotifier.setupRemoteAudio",
         "title": "Claude Notifier: Set up remote audio (play sounds locally over SSH)…"
+      },
+      {
+        "command": "claudeNotifier.toggleAutoMuteWhenFocused",
+        "title": "Claude Notifier: Toggle Auto-mute When Focused"
       }
     ],
     "configuration": {
@@ -262,6 +266,11 @@
           "type": "boolean",
           "default": true,
           "description": "When true, permission and question hooks fired from inside a Task subagent (detected via the agent_id field in the hook payload) are silenced — no sound, no popup. The main agent's own permission/question prompts still fire normally. Useful in auto-accept mode where subagent prompts are noise."
+        },
+        "claudeNotifier.autoMuteWhenFocused": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the task-completed sound and all popups are suppressed while the VS Code window running the task is focused — if you're already looking at the window, the notification is redundant. Scoped per-window: a task finishing in a background window still notifies. Permission and question sounds still play. Toggle it quickly from the status-bar panel or the 'Toggle Auto-mute When Focused' command."
         },
         "claudeNotifier.doneDebounceMs": {
           "type": "number",

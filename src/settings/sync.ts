@@ -93,6 +93,12 @@ export function getSoundVolume(): number {
   }
 }
 
+export function getAutoMuteWhenFocused(): boolean {
+  return (
+    vscode.workspace.getConfiguration("claudeNotifier").get<boolean>("autoMuteWhenFocused") === true
+  );
+}
+
 export function getMinTaskDurationThreshold(): number {
   try {
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));

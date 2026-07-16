@@ -10,6 +10,7 @@ export interface PanelState {
   muted: boolean;
   volume: number;
   threshold: number;
+  autoMuteWhenFocused: boolean;
   events: PanelEvent[];
 }
 
@@ -58,6 +59,11 @@ export function buildPanelMarkdown(state: PanelState): vscode.MarkdownString {
   const thresholdText = state.threshold > 0 ? `${state.threshold}s` : "off";
   md.appendMarkdown(
     `**Min task duration:** ${thresholdText} &nbsp; [Change…](${commandUri("claudeNotifier.setThreshold")})\n\n`
+  );
+
+  const autoMuteLabel = state.autoMuteWhenFocused ? "$(check) On" : "Off";
+  md.appendMarkdown(
+    `**Auto-mute when focused:** [\`  ${autoMuteLabel}  \`](${commandUri("claudeNotifier.toggleAutoMuteWhenFocused")})\n\n`
   );
 
   md.appendMarkdown(`---\n\n`);

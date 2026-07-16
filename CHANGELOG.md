@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.6.0] - 2026-07-10
+
+### Added
+
+- **Auto-mute when focused.** New opt-in setting `claudeNotifier.autoMuteWhenFocused` (default `false`) suppresses the task-completed sound and all popups while the VS Code window running the task is focused — if you're already looking at the window, the notification is redundant. Suppression is scoped **per-window**: a task finishing in a background window still notifies, so multi-window / tabbed setups are never silenced (the global mute flag is untouched). Permission and question sounds still play. Toggle it from the status-bar hover panel or the new **Claude Notifier: Toggle Auto-mute When Focused** command. ([#71](https://github.com/ashmitb95/claude-notifier/issues/71))
+
+### Fixed
+
+- **Spurious notifications inside Cursor.** Cursor executes `~/.claude/settings.json` hooks from its own Composer agent, so finishing a turn in Cursor fired the notifier's sound + popup even though no Claude Code session was involved. The hooks now detect Cursor (its `CURSOR_*` environment, plus its bundle id on macOS) and exit at the top — no sound, no popup, and no signal. Suppressing the signal is what also silences the VS Code extension: the extension reads the signal file and can't detect Cursor on its own, so a Cursor turn on a project also open in VS Code was still firing a notification until the hook stopped writing the signal. Terminal and remote Claude Code sessions still notify normally. ([#74](https://github.com/ashmitb95/claude-notifier/issues/74))
+- **A VS Code window with no folder open fired a notification for every task.** Such a "loose tab" wrote an empty routing marker, which made it claim and handle `done` signals from _every_ project — a long-standing duplicate notification that auto-mute-when-focused made obvious (the stray window is never the focused one, so it always fired). A folderless window now acts only as a fallback: it handles a `done` signal only when no other live window owns that cwd, so it no longer fires for other windows' work, while a Claude session running _inside_ it still notifies under the normal focus rules.
+
+## [3.5.2] - 2026-07-04
+
+### Fixed
+
+- **Signal routing failed on Windows when workspace paths differed only in case.** Path matching compared strings case-sensitively, so a `cwd` like `f:\Github\proj` would not match a workspace folder recorded as `F:\Github\proj`, and the notification was routed away. Paths are now normalized to lowercase on Windows before comparison, in all three path-matching functions (`cwdMatchesFolder` in the extension, plus the PowerShell and JS hook equivalents). Contributed by [@zwye](https://github.com/zwye). ([#75](https://github.com/ashmitb95/claude-notifier/pull/75))
+- **Log timestamps showed UTC instead of local time.** The output-channel logger used `Date.toISOString()`, so timestamps were off by the user's UTC offset (e.g. 8 hours behind for UTC+8). They now render in the local timezone. Contributed by [@zwye](https://github.com/zwye). ([#72](https://github.com/ashmitb95/claude-notifier/pull/72))
+
 ## [3.5.0] - 2026-06-24
 
 ### Added
